@@ -14,13 +14,44 @@ from sklearn.cluster import KMeans
 
 ser = serial.Serial('/dev/cu.usbmodem1421',9600,timeout=None)   # シリアル通信 to Arduino
 #line = ser.readline()
-data = pd.DataFrame(index=[], columns=['err', 'temparature', 'acc_x', 'acc_y', 'acc_z', 'arg_x', 'arg_y', 'arg_z', 'gyr_x', 'gyr_y', 'gyr_z', 'label'])
+data = pd.DataFrame(index=[], columns=['err', 'temparature', 'acc_x', 'acc_y', 'acc_z', 'rad_x', 'rad_y', 'rad_z', 'gyr_x', 'gyr_y', 'gyr_z', 'label'])
 #print(line.strip().decode('utf-8').split(","))
 #10000データで学習を行う
 for i in range(10000):
     line = ser.readline()
-    series = pd.Series(line.strip().decode('utf-8').split(","), index=data.columns)
+    line = line.strip().decode('utf-8').split(",")
+    #print(line)
+    series = pd.Series(line, index=data.columns)
     data = data.append(series,ignore_index=True)
- 
-ser.close()
-print(data)
+    print(series)
+#ser.close()
+#print(data)
+
+#以下学習
+del(data['err'])
+del(data['temparature'])
+data_train, data_test = train_test_split(data, test_size=0.2)
+print("train_data = \n", data_train)
+print("test_data  = \n", data_test)
+
+train_label = data_train['label']
+train_data = data_train[['acc_x', 'acc_y', 'acc_z', 'rad_x', 'rad_y', 'rad_z', 'gyr_x', 'gyr_y', 'gyr_z']]
+test_label = data_test['label']
+test_data = data_test[['acc_x', 'acc_y', 'acc_z', 'rad_x', 'rad_y', 'rad_z', 'gyr_x', 'gyr_y', 'gyr_z']]
+
+#test_pred = clf.predict(data_test[['x','y','z']]);
+clf_svc = svm.LinearSVC(loss='hinge', C=2.5,
+                        class_weight='balanced', random_state=0)
+result = clf_svc.fit(train_data, train_label)
+pred = clf_svc.predict(test_data)
+#print(test_pred);
+print(classification_report(test_label, pred))
+print("正答率 = ", metrics.accuracy_score(test_label, pred))
+
+n_neighbors = 5
+clf_nk = neighbors.KNeighborsClassifier(n_neighbors, weights='distance')
+result = clf_nk.fit(train_data, train_label)
+pred_nk = clf_nk.predict(test_data)
+#print(test_pred);
+print(classification_report(test_label, pred_nk))
+print("正答率 = ", metrics.accuracy_score(test_label, pred_nk))
