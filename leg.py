@@ -17,7 +17,7 @@ ser = serial.Serial('/dev/cu.usbmodem1421',9600,timeout=None)   # シリアル�
 data = pd.DataFrame(index=[], columns=['err', 'temparature', 'acc_x', 'acc_y', 'acc_z', 'rad_x', 'rad_y', 'rad_z', 'gyr_x', 'gyr_y', 'gyr_z', 'label'])
 #print(line.strip().decode('utf-8').split(","))
 #10000データで学習を行う
-for i in range(10000):
+for i in range(3000):
     line = ser.readline()
     line = line.strip().decode('utf-8').split(",")
     #print(line)
@@ -27,6 +27,7 @@ for i in range(10000):
 #ser.close()
 #print(data)
 
+data.to_csv("test3.csv", sep=",")
 #以下学習
 del(data['err'])
 del(data['temparature'])
