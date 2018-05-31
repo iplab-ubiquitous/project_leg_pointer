@@ -22,10 +22,11 @@ for i in range(3000):
     line = line.strip().decode('utf-8').split(",")
     #print(line)
     series = pd.Series(line, index=data.columns)
-    data = data.append(series,ignore_index=True)
+    data = data.append(series, ignore_index=True)
     print(series)
 #ser.close()
 #print(data)
+
 
 data.to_csv("test3.csv", sep=",")
 #以下学習

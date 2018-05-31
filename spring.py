@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 
 import pandas as pd
 
-dataset1 = pd.read_csv("test2.csv");
+dataset1 = pd.read_csv("test3.csv");
 #print(dataset1);
 
 '''
@@ -45,10 +45,11 @@ plt.show();
 
 #特徴量の次元を圧縮
 #似たような性質の特徴を同じものとして扱います
+#del(dataset1['index']);
 del(dataset1['err']);
 del(dataset1['temparature']);
-del(dataset1['a']);
-del(dataset1['b']);
+#del(dataset1['a']);
+#del(dataset1['b']);
 dataset1_train, dataset1_test = train_test_split(dataset1,test_size=0.2);
 print("train_data = \n", dataset1_train);
 print("test_data  = \n", dataset1_test);
