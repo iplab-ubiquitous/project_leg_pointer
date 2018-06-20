@@ -12,7 +12,7 @@ from sklearn.kernel_approximation import RBFSampler
 from sklearn.cluster import KMeans
 
 
-ser = serial.Serial('/dev/cu.usbmodem1411',115200,timeout=None)   # シリアル通信 to Arduino
+ser = serial.Serial('/dev/cu.usbmodem1421',115200,timeout=None)   # シリアル通信 to Arduino
 #line = ser.readline()
 data = pd.DataFrame(index=[], columns=['Left_ACC_X', 'Left_ACC_Y', 'Left_ACC_Z', 
                                        'Left_GYR_X', 'Left_GYR_Y', 'Left_GYR_Z', 
@@ -21,30 +21,65 @@ data = pd.DataFrame(index=[], columns=['Left_ACC_X', 'Left_ACC_Y', 'Left_ACC_Z',
                                        'move'])
 #print(line.strip().decode('utf-8').split(","))
 #10000データで学習を行う
-for i in range(100):
-    line = ser.readline()
-    line = line.strip().decode('utf-8').split(",")
-    line.append("right_flick")
-    #print(line)
-    series = pd.Series(line, index=data.columns)
-    data = data.append(series, ignore_index=True)
-    print(series)
+for i in range(10):
+    
+    for j1 in range(100):
+        line = ser.readline()
+        line = line.strip().decode('utf-8').split(",")
+        line.append("right")
+        #print(line)
+        series = pd.Series(line, index=data.columns)
+        data = data.append(series, ignore_index=True)
+        print(i)
+        print(series)
+
+for i in range(10):
+
+    for j1 in range(100):
+        line = ser.readline()
+        line = line.strip().decode('utf-8').split(",")
+        line.append("left")
+        #print(line)
+        series = pd.Series(line, index=data.columns)
+        data = data.append(series, ignore_index=True)
+        print(i)
+        print(series)
+
+for i in range(10):
+
+    for j1 in range(100):
+        line = ser.readline()
+        line = line.strip().decode('utf-8').split(",")
+        line.append("upper")
+        #print(line)
+        series = pd.Series(line, index=data.columns)
+        data = data.append(series, ignore_index=True)
+        print(i)
+        print(series)
 #ser.close()
 #print(data)
 
 
 data.to_csv("test4.csv", sep=",")
 #以下学習
-del(data['err'])
-del(data['temparature'])
+#del(data['err'])
+#del(data['temparature'])
 data_train, data_test = train_test_split(data, test_size=0.2)
 print("train_data = \n", data_train)
 print("test_data  = \n", data_test)
 
-train_label = data_train['label']
-train_data = data_train[['acc_x', 'acc_y', 'acc_z', 'rad_x', 'rad_y', 'rad_z', 'gyr_x', 'gyr_y', 'gyr_z']]
-test_label = data_test['label']
-test_data = data_test[['acc_x', 'acc_y', 'acc_z', 'rad_x', 'rad_y', 'rad_z', 'gyr_x', 'gyr_y', 'gyr_z']]
+train_label = data_train['move']
+train_data = data_train[['Left_ACC_X', 'Left_ACC_Y', 'Left_ACC_Z',
+                                       'Left_GYR_X', 'Left_GYR_Y', 'Left_GYR_Z',
+                                       'Right_ACC_X', 'Right_ACC_Y', 'Right_ACC_Z',
+                                       'Right_GYR_X', 'Right_GYR_Y', 'Right_GYR_Z',
+                                       ]]
+test_label = data_test['move']
+test_data = data_test[['Left_ACC_X', 'Left_ACC_Y', 'Left_ACC_Z',
+                       'Left_GYR_X', 'Left_GYR_Y', 'Left_GYR_Z',
+                       'Right_ACC_X', 'Right_ACC_Y', 'Right_ACC_Z',
+                       'Right_GYR_X', 'Right_GYR_Y', 'Right_GYR_Z',
+                       ]]
 
 #test_pred = clf.predict(data_test[['x','y','z']]);
 clf_svc = svm.LinearSVC(loss='hinge', C=2.5,
