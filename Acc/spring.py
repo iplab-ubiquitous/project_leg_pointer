@@ -123,3 +123,6 @@ pred_nk = clf_nk.predict(test_data)
 #print(test_pred);
 print(classification_report(test_label, pred_nk))
 print("正答率 = ", metrics.accuracy_score(test_label, pred_nk))
+scores = cross_validation.cross_val_score(clf_result, X_std, z, cv=10)
+print("平均正解率 = ", scores.mean())
+print("正解率の標準偏差 = ", scores.std())
