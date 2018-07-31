@@ -1,4 +1,4 @@
 *.csv
-threadtest.py
-voltage_test.py
+*test.py
+
 serial_blink.py
