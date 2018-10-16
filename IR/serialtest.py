@@ -13,9 +13,13 @@ window_size_x = 1280
 window_size_y = 720
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
+wait_flame = 8
 sensor_val = np.zeros(num_of_sensor, dtype=np.float)
 weight = ([64.00] * num_of_sensor)
 pos = np.zeros(num_of_sensor, dtype=np.float)
+val = np.zeros((wait_flame, num_of_sensor), dtype=np.float)
+
+alpha = 0.1
 
 
 class sensor_read:
@@ -28,11 +32,6 @@ class sensor_read:
         lst = float(0)
         while self.ser.in_waiting > 1 or lst == float(0):
             lst = self.ser.readline().strip().decode("utf-8").split(',')
-            print(lst)
-            print(type(lst))
-
-        #line_f = [float(s) for s in self.line]
-        #return line_f
 
         return lst
 
@@ -41,50 +40,17 @@ class draw_gui(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.pos_x0 = 0
-        self.pos_x1 = 0
-        self.pos_y0 = 0
-        self.pos_y1 = 0
-        self.old_x = window_size_x/2
-        self.new_x = 0
-        self.old_y = window_size_y/2
-        self.new_y = 0
+
+        self.new_y_arr = np.zeros(num_of_sensor, dtype=np.float)
         self.resize(window_size_x, window_size_y)
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.value_upd)
-        #self.timer.timeout.connect(self.value_upd_y)
         self.timer.start(10)  # 100Hz
+        
 
-        self.button_left_calb = QPushButton(self)
-        self.button_right_calb = QPushButton(self)
-        self.button_up_calb = QPushButton(self)
-        self.button_down_calb = QPushButton(self)
-        self.button_reset = QPushButton(self)
 
-        self.button_left_calb.move(0, 50)
-        self.button_left_calb.setText("キャリブレーション:左")
-        self.button_left_calb.clicked.connect(self.calibration_left)
-        self.left_calb_flag = False
 
-        self.button_right_calb.move(200, 50)
-        self.button_right_calb.setText("キャリブレーション:右")
-        self.button_right_calb.clicked.connect(self.calibration_right)
-        self.right_calb_flag = False
-
-        self.button_up_calb.move(0, 100)
-        self.button_up_calb.setText("キャリブレーション:上")
-        self.button_up_calb.clicked.connect(self.calibration_up)
-        self.up_calb_flag = False
-
-        self.button_down_calb.move(200, 100)
-        self.button_down_calb.setText("キャリブレーション:下")
-        self.button_down_calb.clicked.connect(self.calibration_down)
-        self.down_calb_flag = False
-
-        self.button_reset.move(400, 50)
-        self.button_reset.setText("リセット")
-        self.button_reset.clicked.connect(self.calibration_reset)
 
         self.textbox = QLineEdit(self)
         self.textbox.move(10, 10)
@@ -93,15 +59,17 @@ class draw_gui(QWidget):
             pos[i] = (window_size_x / -2) + ((window_size_x / 10) * i)
 
         #pyautogui.FAILSAFE = False
-
+        self.old_ema = np.zeros(num_of_sensor, dtype=np.float)
+        self.new_ema = np.zeros(num_of_sensor, dtype=np.float)
     #描画と数値計算を直列でやっている
 
     def paintEvent(self, QPaintEvent):
         painter = QPainter(self)
-        self.textbox.setText(str(self.new_x-640))  # 座標確認用
+        self.textbox.setText(str(int(min(self.new_y_arr))))  # 座標確認用
         painter.setPen(Qt.black)
         painter.setBrush(Qt.red)
-        painter.drawRect(self.new_x, self.new_y, 20, 20)
+        for i in range(num_of_sensor):
+            painter.drawRect(i*50+240, self.new_y_arr[i], 20, 20)
 
         '''
         painter.drawRect(100, 400, 100, 100)
@@ -121,47 +89,39 @@ class draw_gui(QWidget):
         ##################
 
         #座標とどの四角形が重なっているかの当たり判定'''
-    def calibration_left(self):
-        if not self.left_calb_flag:
-            lst = []
-            for i in range(100):
-                lst = rd.read_test_ser()
-            print(lst)
-            self.left_calb_flag = True
-
-    def calibration_right(self):
-        if not self.right_calb_flag:
-            lst = []
-            for i in range(100):
-                lst = rd.read_test_ser()
-            print(lst)
-            self.right_calb_flag = True
-
-    def calibration_up(self):
-        if not self.up_calb_flag:
-            lst = []
-            for i in range(100):
-                lst = rd.read_test_ser()
-            print(lst)
-            self.up_calb_flag = True
-
-    def calibration_down(self):
-        if not self.down_calb_flag:
-            lst = []
-            for i in range(100):
-                lst = rd.read_test_ser()
-            print(lst)
-            self.down_calb_flag = True
-
-    def calibration_reset(self):
-        self.left_calb_flag = False
-        self.right_calb_flag = False
-        self.up_calb_flag = False
-        self.down_calb_flag = False
-
+  
     def value_upd(self):
-        sensor_val = rd.read_test_ser()
+        tmp = rd.read_test_ser()
+        sensor_val = [float(v) for v in tmp]
+
+        for i in range(1, wait_flame):
+            val[i-1] = val[i]
+        val[wait_flame-1] = sensor_val
+        #加重平均フィルタ
+        '''
+        for i in range(num_of_sensor):
+            s = 0
+            l = 0
+            for j in range(wait_flame):
+                s += (wait_flame - j) * val[j][i]
+                l += j+1
+            sensor_val[i] = s / l
+            val[wait_flame-1][i] = sensor_val[i]
         print(sensor_val)
+        '''
+        #指数平均フィルタ
+        if np.allclose(self.old_ema, np.zeros(num_of_sensor, dtype=np.float)):
+            self.old_ema = sensor_val
+        else:
+            for i in range(num_of_sensor):
+                self.new_ema[i] = (sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
+            for i in range(num_of_sensor):
+                self.new_y_arr[i] = (window_size_y-20) * self.new_ema[i] / 64.0
+            self.old_ema = self.new_ema
+        self.update()
+
+
+        
 
  
     def main(self):
