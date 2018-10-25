@@ -19,7 +19,7 @@ alpha = 0.1
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem1421', 115200)
+        self.ser = serial.Serial('/dev/cu.usbmodem14201', 115200)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -68,7 +68,7 @@ class draw_gui(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.value_upd)
         #self.timer.timeout.connect(self.value_upd_y)
-        self.timer.start(10)  # 100Hz
+        self.timer.start(5)  # smaller than 200Hz
 
         self.button_left_calb = QPushButton(self)
         self.button_right_calb = QPushButton(self)
