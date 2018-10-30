@@ -9,7 +9,7 @@ from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 import serial
 import numpy as np
 
-window_size_x = 1280
+window_size_x = 1280    
 window_size_y = 720
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
@@ -68,7 +68,7 @@ class draw_gui(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.value_upd)
         #self.timer.timeout.connect(self.value_upd_y)
-        self.timer.start(5)  # smaller than 200Hz
+        self.timer.start(5)  # smaller than200Hz
 
         self.button_left_calb = QPushButton(self)
         self.button_right_calb = QPushButton(self)
