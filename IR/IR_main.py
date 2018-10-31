@@ -27,9 +27,6 @@ class sensor_read:
         lst = float(0)
         while self.ser.in_waiting > 1 or lst == float(0):
             lst = self.ser.readline().strip().decode("utf-8").split(',')
-            
-        #line_f = [float(s) for s in self.line]
-        #return line_f
 
         return lst
 

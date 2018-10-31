@@ -24,7 +24,7 @@ num_of_targets = 10
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem14201', 115200)
+        self.ser = serial.Serial('/dev/cu.usbmodem14201', 230400)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -156,10 +156,12 @@ class draw_gui(QWidget):
 
     def keyPressEvent(self, keyevent):
         #print(keyevent.key())
-        if keyevent.key() == Qt.Key_Shift:  # Key:Z
+        if keyevent.key() == Qt.Key_Shift and self.collision_flag and self.collision_num == self.target_num:  # Key:Z
             
             self.target_num += 1
-            print(self.target_num)
+            self.target_num = self.target_num % num_of_targets
+            
+                
             
     def pointer_calc(self, sensor_val, left_limit, right_limit, upper_limit, lower_limit, flag):
         x = 0
