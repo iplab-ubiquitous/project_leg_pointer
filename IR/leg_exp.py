@@ -8,16 +8,18 @@ from PyQt5.QtGui import QPainter, QFont, QColor
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QPoint
 #PySerial
 import serial
+import pyautogui
 import numpy as np
 import random
 import time
 
 window_size_x = 1920
 window_size_y = 1080
+window_size_x, window_size_y = pyautogui.size()
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
 wait_flame = 10
-alpha = 0.1
+alpha = 0.095
 pointer_size = 20
 output_path = 'exp_data/leg/data_p0_leg.csv'
 
@@ -110,8 +112,9 @@ class main_window(QWidget):
         self.exp_timer_init()
         self.exp_end_flag = False
         self.miss = 0
+        self.miss_flag = False
         self.amplitude = 0
-        self.result = np.empty((0, 5), float)
+        self.result = np.empty((0, 6), float)
 
         #衝突判定とターゲット位置計算
         self.collision_flag = False
@@ -231,7 +234,7 @@ class main_window(QWidget):
                     self.target_order[self.order_num]))
         print('time: ' + str(self.selected))
         print('amplitude: ' + str(self.amplitude))
-        self.result = np.append(self.result, np.array([[self.radius, self.target_radius, self.selected, self.amplitude, 1+self.amplitude/self.target_radius]]), axis=0)
+        self.result = np.append(self.result, np.array([[self.radius, self.target_radius, self.selected, self.amplitude, 1+self.amplitude/self.target_radius, self.miss_flag]]), axis=0)
         #全体半径・ターゲット円半径・時間・距離・ID値の順に出力
 
         self.start = time.time()
@@ -239,7 +242,7 @@ class main_window(QWidget):
         print('selection miss: ' + str(self.miss) + ' time(s)')
         print(self.result)
         np.savetxt(output_path, self.result, delimiter=',', fmt=[
-                   '%.0f', '%.0f', '%.5f', '%.5f', '%.5f'], header='radius, width, time, distance, ID', comments='')
+                   '%.0f', '%.0f', '%.5f', '%.5f', '%.5f', '%.0f'], header='radius, width, time, distance, ID, miss', comments='')
         self.exp_timer_init()
     #操作時間計測
 
@@ -295,12 +298,15 @@ class main_window(QWidget):
                 self.exp_timer_start()
             elif self.order_num == self.num_of_targets - 1:
                 self.exp_timer_select()
+                self.miss_flag = False
                 self.exp_timer_stop()
                 self.exp_end_flag = True
             else:
                 self.exp_timer_select()
+                self.miss_flag = False
 
             if not self.collision_num == self.target_order[self.order_num]:
+                self.miss_flag = True
                 self.miss += 1
             self.order_num += 1
             self.order_num = self.order_num % self.num_of_targets
@@ -444,7 +450,7 @@ class main_window(QWidget):
         #膝検出
         if self.calibration_check():
             self.x, self.y = self.pointer_calc(
-                sensor_val, self.left_limit, self.right_limit, self.upper_limit, self.lower_limit, self.flag)
+                sensor_val, self.left_limit, self.right_limit, self.upper_limit, self.lower_limit, self.leg_flag)
 
             #衝突判定
         for i in range(self.num_of_targets):

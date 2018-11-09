@@ -211,7 +211,7 @@ class main_window(QWidget):
 
     def value_upd(self):
         self.x, self.y = pyautogui.position()
-
+        self.update()
         
 
     def main(self):

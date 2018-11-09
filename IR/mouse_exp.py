@@ -16,7 +16,7 @@ window_size_y = 1080
 #window_size = QtGui.qApp.desktop().width()
 pointer_size = 20
 
-output_path = 'data_p0_mouse.csv'
+output_path = 'exp_data/mouse/data_p0_mouse.csv'
 
 
 
@@ -70,8 +70,9 @@ class main_window(QWidget):
         self.exp_timer_init()
         self.exp_end_flag = False
         self.miss = 0
+        self.miss_flag = False
         self.amplitude = 0
-        self.result = np.empty((0, 5), float)
+        self.result = np.empty((0, 6), float)
         
         #衝突判定とターゲット位置計算
         self.collision_flag = False
@@ -144,14 +145,14 @@ class main_window(QWidget):
         print('time: ' + str(self.selected))
         self.amplitude = self.calc_amplitude(self.order_num, self.order_num-1)
         print('amplitude: ' + str(self.amplitude))
-        self.result = np.append(self.result, np.array([[self.radius, self.target_radius, self.selected, self.amplitude, 1+self.amplitude/self.target_radius]]), axis=0)
+        self.result = np.append(self.result, np.array([[self.radius, self.target_radius, self.selected, self.amplitude, 1+self.amplitude/self.target_radius, self.miss_flag]]), axis=0)
         
         self.start = time.time()
     def exp_timer_stop(self):
         print('selection miss: ' + str(self.miss) + ' time(s)')
         print(self.result)
         np.savetxt(output_path, self.result, delimiter=',', fmt=[
-                   '%.0f', '%.0f', '%.5f', '%.5f', '%.5f'], header='radius, width, time, distance, ID', comments='')
+                   '%.0f', '%.0f', '%.5f', '%.5f', '%.5f', '%.0f'], header='radius, width, time, distance, ID, miss', comments='')
         self.exp_timer_init()
 
     def calc_amplitude(self, n1, n2):
@@ -165,6 +166,7 @@ class main_window(QWidget):
         self.set_target()
         self.exp_end_flag = False
         self.miss = 0
+        self.miss_flag = False
         self.update()
 
     def paintEvent(self, QPaintEvent):
@@ -199,20 +201,29 @@ class main_window(QWidget):
                 self.exp_timer_start()
             elif self.order_num == self.num_of_targets - 1:
                 self.exp_timer_select()
+                self.miss_flag = False
                 self.exp_timer_stop()
                 self.exp_end_flag = True
             else:
                 self.exp_timer_select()
+                self.miss_flag = False
             
             if not self.collision_num == self.target_order[self.order_num]:
+                self.miss_flag = True
                 self.miss += 1
             self.order_num += 1
             self.order_num = self.order_num % self.num_of_targets
 
     def value_upd(self):
         self.x, self.y = pyautogui.position()
+        for i in range(self.num_of_targets):
+            self.collision_flag = ((self.x - self.target_point[i].x()) * (self.x - self.target_point[i].x())) + (
+                (self.y - self.target_point[i].y()) * (self.y - self.target_point[i].y())) <= (self.target_radius + pointer_size) * (self.target_radius + pointer_size)
+            if self.collision_flag:
+                self.collision_num = i
+                break
 
-        
+        self.update()
 
     def main(self):
         self.show()
