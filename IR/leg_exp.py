@@ -18,7 +18,7 @@ window_size_y = 1080
 window_size_x, window_size_y = pyautogui.size()
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
-wait_flame = 10
+wait_flame = 100
 alpha = 0.095
 pointer_size = 20
 output_path = 'exp_data/leg/data_p0_leg.csv'
@@ -26,7 +26,7 @@ output_path = 'exp_data/leg/data_p0_leg.csv'
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem14201', 230400)
+        self.ser = serial.Serial('/dev/cu.usbmodem14201', 460800)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -87,6 +87,7 @@ class main_window(QWidget):
         self.weight = ([1.00] * num_of_sensor)
         self.val = np.zeros((wait_flame, num_of_sensor), dtype=np.float)
         self.leg_flag = False
+        self.sensor_flt = np.zeros((wait_flame,num_of_sensor),dtype=np.float)
 
         #指数平均平滑フィルタ(EMA)用
         self.old_ema = np.zeros(num_of_sensor, dtype=np.float)
@@ -266,11 +267,7 @@ class main_window(QWidget):
         self.textbox_x.setText(str(int(self.x)))  # 座標確認用
         self.textbox_y.setText(str(int(self.y)))  # 座標確認用
         painter.setPen(Qt.black)
-        if self.leg_flag: 
-            painter.setBrush(Qt.red)
-        else:
-            painter.setBrush(Qt.white)
-        painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
+
 
         if not self.exp_end_flag:
             painter.setBrush(QColor(0x48, 0xcb, 0xeb))
@@ -286,10 +283,16 @@ class main_window(QWidget):
                 painter.drawEllipse(
                     self.target_point[i], self.target_radius, self.target_radius)
         if self.collision_flag:
-            painter.setBrush(Qt.white)
+            #painter.setBrush(Qt.white)
             painter.drawEllipse(
                 self.target_point[self.collision_num], self.target_radius, self.target_radius)
             self.textbox_t.setText(str(self.collision_num))
+
+        if self.leg_flag:
+            painter.setBrush(Qt.red)
+        else:
+            painter.setBrush(Qt.white)
+        painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
 
     def keyPressEvent(self, keyevent):
         #print(keyevent.key())
@@ -329,13 +332,39 @@ class main_window(QWidget):
         sensor_val = self.new_ema
         #指数平均平滑フィルタ
 
+        for i in range(wait_flame-1):
+            self.sensor_flt[i+1,:] = self.sensor_flt[i,:]
+        n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
+        max_val = np.max(sensor_val)
+        near_snum = []
+        for v in range(num_of_sensor):
+            if sensor_val[v] < (max_val) * 0.6:
+                self.sensor_flt[0, v] = sensor_val[v]*0.1
+            else:
+                near_snum.append(v)
+                self.sensor_flt[0, v] = sensor_val[v]
+        for v in range(num_of_sensor):
+            if v in near_snum:
+                n_sensor_val[v] = np.average(self.sensor_flt[:,v])
+                
+            else:
+                n_sensor_val[v] = np.average(self.sensor_flt[[1, wait_flame-1], v])*0.9 + self.sensor_flt[0, v] * 0.1
+                
+        sensor_val = n_sensor_val
+
         if self.leg_flag:
             #y座標計算
-            self.new_y = (window_size_y) * (min(sensor_val)-5.0) / 12.0-5.0
+            top_sensor = np.argsort(-sensor_val)
+            self.new_y = (window_size_y) * (59.0-max(sensor_val)) / 59.0-52.0
+            #self.new_y = (window_size_y) * (59.0 - sensor_val[int(np.median(near_snum))]) / 59.0-52.0
+            #self.new_y = (window_size_y) * (59.0 - np.average([sensor_val[v] for v in near_snum])) / 59.0-52.0
 
             #x座標計算
             for i in range(num_of_sensor):
-                self.weight[i] = 1 / (sensor_val[i] - min(sensor_val) + 2)
+                if i > 6:
+                    sensor_val[top_sensor[i]] = 0
+            for i in range(num_of_sensor):
+                self.weight[i] = 1 / (max(sensor_val) - sensor_val[i] + 2)
             s = sum(self.weight)
             self.new_x = -2
             for j in range(num_of_sensor):
@@ -366,9 +395,9 @@ class main_window(QWidget):
         x = 0
         y = 0
         if not self.left_calb_flag:
-            for i in range(30):
+            for i in range(200):
                 tmp = rd.read_test_ser()
-                val = [float(v) for v in tmp]
+                val = [64-float(v) for v in tmp]
                 x, y = self.pointer_calc(
                     val, 0, window_size_x, 0, window_size_y, True)
             self.left_limit = x
@@ -381,9 +410,9 @@ class main_window(QWidget):
         x = 0
         y = 0
         if not self.right_calb_flag:
-            for i in range(30):
+            for i in range(200):
                 tmp = rd.read_test_ser()
-                val = [float(v) for v in tmp]
+                val = [64-float(v) for v in tmp]
                 x, y = self.pointer_calc(
                     val, 0, window_size_x, 0, window_size_y, True)
             self.right_limit = x
@@ -398,7 +427,7 @@ class main_window(QWidget):
         if not self.up_calb_flag:
             for i in range(200):
                 tmp = rd.read_test_ser()
-                val = [float(v) for v in tmp]
+                val = [64-float(v) for v in tmp]
                 x, y = self.pointer_calc(
                     val, 0, window_size_x, 0, window_size_y, True)
             self.upper_limit = y
@@ -413,7 +442,7 @@ class main_window(QWidget):
         if not self.down_calb_flag:
             for i in range(200):
                 tmp = rd.read_test_ser()
-                val = [float(v) for v in tmp]
+                val = [64-float(v) for v in tmp]
                 x, y = self.pointer_calc(
                     val, 0, window_size_x, 0, window_size_y, True)
             self.lower_limit = y
@@ -438,12 +467,12 @@ class main_window(QWidget):
         self.new_x = 0
         not_update = True
         tmp = rd.read_test_ser()
-        sensor_val = [float(v) for v in tmp]
+        sensor_val = [64-float(v) for v in tmp]
         #膝検出
         self.leg_flag = False
         pick = 0
         for i in range(num_of_sensor):
-            pick += sensor_val[i] < 50
+            pick += sensor_val[i] > 20
             if(pick > 3):
                 self.leg_flag = True
                 break

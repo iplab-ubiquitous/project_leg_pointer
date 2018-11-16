@@ -16,15 +16,15 @@ window_size_x = 1920
 window_size_y = 1080
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
-wait_flame = 10
-alpha = 0.01
+wait_flame = 100
+alpha = 0.1
 pointer_size = 20
 output_path = 'data_p0_leg.csv'
 
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem14201', 230400)
+        self.ser = serial.Serial('/dev/cu.usbmodem14201', 460800)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -44,6 +44,8 @@ class main_window(QWidget):
     #膝位置計算用変数リセット
     def value_init(self):
         self.sensor_val = np.zeros(num_of_sensor, dtype=np.float)
+        self.sensor_flt = np.zeros((wait_flame,num_of_sensor), dtype=np.float)
+        self.n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         self.weight = ([1.00] * num_of_sensor)
 
     #指数平均平滑フィルタ変数のリセット(本当は必要ないかもしれない)
@@ -65,6 +67,7 @@ class main_window(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.value_upd)
         self.timer.start(5)  # 200fps以下
+        
 
     #実験データ収集用
     #操作時間計測
@@ -77,13 +80,15 @@ class main_window(QWidget):
 
         for i in range(num_of_sensor):
             painter.drawRect(window_size_x / 12 * (i+1), window_size_y -
-                             (64-self.sensor_val[i])*10-100, 40,  (64-self.sensor_val[i])*10)
+                             (self.n_sensor_val[i])*10-100, 40,  (self.n_sensor_val[i])*10)
 
 
     def value_upd(self):
+        
         #print(self.left_limit, self.right_limit,self.upper_limit, self.lower_limit)
         tmp = rd.read_test_ser()
-        self.sensor_val = [float(v) for v in tmp]
+        self.sensor_val = [64-float(v) for v in tmp]
+
 
         #指数平均平滑フィルタ
         if np.allclose(self.old_ema, np.zeros(num_of_sensor, dtype=np.float)):
@@ -96,7 +101,39 @@ class main_window(QWidget):
         self.sensor_val = self.new_ema
         #指数平均平滑フィルタ
 
-        max_n = np.argmax(self.sensor_val)
+        a = self.sensor_val
+        top_sensor = np.argsort(-a)
+        sv_ydata = [top_sensor[i] for i in range(num_of_sensor) if i < 3]
+        print(sv_ydata)
+        
+        for i in range(10):
+            if i > 4:
+                self.n_sensor_val[top_sensor[i]] = 0
+            else:
+                self.n_sensor_val[top_sensor[i]] = self.sensor_val[top_sensor[i]]
+        
+        for i in range(wait_flame-1):
+            self.sensor_flt[i+1,:] = self.sensor_flt[i,:]
+        '''
+        max_val = np.max(self.sensor_val)
+        near_snum = []
+        for v in range(num_of_sensor):
+            if self.sensor_val[v] < (max_val) * 0.25:
+                self.sensor_flt[0,v] = self.sensor_val[v]*0.3
+            else:
+                near_snum.append(v)
+                self.sensor_flt[0,v] = self.sensor_val[v]
+
+        for v in range(num_of_sensor):
+            if v in near_snum:
+                if np.max(self.sensor_flt[:, v])-np.min(self.sensor_flt[:, v]) < 5:
+                    self.n_sensor_val[v] = np.average(self.sensor_flt[:,v])
+                else:
+                    self.n_sensor_val[v] = np.average(
+                        self.sensor_flt[[1,wait_flame-1], v])*0.9 + self.sensor_flt[0, v] *0.1
+            else:
+                self.n_sensor_val[v] = self.sensor_flt[0,v]
+        '''
 
         '''
         for i1 in range(max_n-1, -1):
@@ -106,6 +143,7 @@ class main_window(QWidget):
             if self.sensor_val[i2] < self.sensor_val[i2+1]-20:
                 self.sensor_val[i2+1] = 0
         '''
+        #print(self.sensor_flt[:,5])
         self.update()
 
 
