@@ -111,11 +111,14 @@ class main_window(QWidget):
 
         #実験データ収集
         self.exp_timer_init()
+        self.exp_start_flag = False
         self.exp_end_flag = False
+        self.exp_num = 0
         self.miss = 0
         self.miss_flag = False
+        self.clicked = 0
         self.amplitude = 0
-        self.result = np.empty((0, 6), float)
+        self.logger = np.empty((0, 8), float)
 
         #衝突判定とターゲット位置計算
         self.collision_flag = False
@@ -223,33 +226,31 @@ class main_window(QWidget):
 
     #実験データ収集用
     #操作時間計測
+    def data_log(self):
+        if self.exp_start_flag:
+            dist = self.calc_amplitude(self.order_num)
+            tm = time.time()-self.start
+            self.logger = np.append(self.logger, np.array(
+                [[self.exp_num,  self.x, self.y, self.clicked, self.miss, tm, dist, 1+(dist/self.target_radius)]]), axis=0)
+            self.miss_flag = False
     def exp_timer_init(self):
-        self.start = 0          #計測開始時刻
-        self.selected = 0       #選択時の時刻
-    def exp_timer_start(self):
-        self.start = time.time()
-    def exp_timer_select(self):
-        self.selected = time.time()-self.start 
-        self.amplitude = self.calc_amplitude(self.order_num, self.order_num-1) #前のターゲットと次のターゲットとの距離
-        print('direction:' + str(self.target_order[self.order_num-1]) + '->' + str(
-                    self.target_order[self.order_num]))
-        print('time: ' + str(self.selected))
-        print('amplitude: ' + str(self.amplitude))
-        self.result = np.append(self.result, np.array([[self.radius, self.target_radius, self.selected, self.amplitude, 1+self.amplitude/self.target_radius, self.miss_flag]]), axis=0)
-        #全体半径・ターゲット円半径・時間・距離・ID値の順に出力
+        self.start = 0
+        self.exp_start_flag = False
 
-        self.start = time.time()
     def exp_timer_stop(self):
+        self.exp_start_flag = False
+        self.exp_end_flag = True
+        dist = self.calc_amplitude(self.order_num)
+        tm = time.time()-self.start
+        self.logger = np.append(self.logger, np.array(
+            [[self.exp_num, self.x, self.y, self.clicked, self.miss, tm, dist, 1+(dist/self.target_radius)]]), axis=0)
         print('selection miss: ' + str(self.miss) + ' time(s)')
-        print(self.result)
-        np.savetxt(output_path, self.result, delimiter=',', fmt=[
-                   '%.0f', '%.0f', '%.5f', '%.5f', '%.5f', '%.0f'], header='radius, width, time, distance, ID, miss', comments='')
+        np.savetxt(output_path, self.logger, delimiter=',', fmt=[
+                   '%.0f', '%.0f', '%.0f', '%.0f', '%.0f', '%.3f', '%.2f', '%.2f'], header='exp_num, x, y, keypress, missed, time, distance, ID_val', comments='')
         self.exp_timer_init()
-    #操作時間計測
 
-    #ターゲット同士のユークリッド距離計算
-    def calc_amplitude(self, n1, n2):
-        return math.sqrt(math.pow(self.target_point[self.target_order[n1]].x() - self.target_point[self.target_order[n2]].x(), 2) + math.pow(self.target_point[self.target_order[n1]].y() - self.target_point[self.target_order[n2]].y(), 2))
+    def calc_amplitude(self, next_t):
+        return math.sqrt(math.pow(self.target_point[self.target_order[next_t]].x() - self.x, 2) + math.pow(self.target_point[self.target_order[next_t]].y() - self.y, 2))
 
 
     def set_target_config(self):
@@ -257,8 +258,14 @@ class main_window(QWidget):
         self.radius = int(self.set_radius.text())
         self.target_radius = int(self.set_target_radius.text())
         self.set_target()
-        self.exp_end_flag = False
+        self.exp_timer_init()
+        
+        self.clicked = 0
         self.miss = 0
+        self.miss_flag = False
+        if self.exp_end_flag:
+            self.exp_num += 1
+            self.exp_end_flag = False
         self.update()
 
 
@@ -267,9 +274,10 @@ class main_window(QWidget):
         self.textbox_x.setText(str(int(self.x)))  # 座標確認用
         self.textbox_y.setText(str(int(self.y)))  # 座標確認用
         painter.setPen(Qt.black)
-
-
-        if not self.exp_end_flag:
+        #painter.setBrush(Qt.red)
+        #painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
+        
+        if self.exp_start_flag:
             painter.setBrush(QColor(0x48, 0xcb, 0xeb))
             for i in range(self.num_of_targets):
                 painter.drawEllipse(
@@ -284,37 +292,31 @@ class main_window(QWidget):
                     self.target_point[i], self.target_radius, self.target_radius)
         if self.collision_flag:
             #painter.setBrush(Qt.white)
-            painter.drawEllipse(
-                self.target_point[self.collision_num], self.target_radius, self.target_radius)
+            #painter.drawEllipse(
+                #self.target_point[self.collision_num], self.target_radius, self.target_radius)
             self.textbox_t.setText(str(self.collision_num))
-
-        if self.leg_flag:
-            painter.setBrush(Qt.red)
-        else:
-            painter.setBrush(Qt.white)
+        painter.setBrush(Qt.red)
         painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
+
 
     def keyPressEvent(self, keyevent):
         #print(keyevent.key())
-        if keyevent.key() == Qt.Key_Shift and self.collision_flag:  # Key:Shift
-            if self.order_num == 0:
-                self.exp_timer_start()
-            elif self.order_num == self.num_of_targets - 1:
-                self.exp_timer_select()
-                self.miss_flag = False
-                self.exp_timer_stop()
-                self.exp_end_flag = True
-            else:
-                self.exp_timer_select()
-                self.miss_flag = False
-
-            if not self.collision_num == self.target_order[self.order_num]:
+        if keyevent.key() == Qt.Key_Return:  # Key:Shift
+            self.clicked += 1
+            if not (self.collision_flag and self.collision_num == self.target_order[self.order_num]):
                 self.miss_flag = True
                 self.miss += 1
+            if self.order_num == self.num_of_targets - 1:
+                self.exp_timer_stop()
+                
+
+            self.miss_flag = False
             self.order_num += 1
             self.order_num = self.order_num % self.num_of_targets
-            
-                
+        if keyevent.key() == Qt.Key_Shift:
+            self.start = time.time()
+            self.exp_start_flag = True
+            print("start")
     #膝位置計算
     def pointer_calc(self, sensor_val, left_limit, right_limit, upper_limit, lower_limit, flag):
         x = 0
@@ -489,6 +491,7 @@ class main_window(QWidget):
                     self.collision_num = i
                     break
         self.update()
+        self.data_log()
 
     def main(self):
         self.show()
