@@ -17,7 +17,7 @@ window_size_y = 1080
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
 wait_flame = 100
-alpha = 0.1
+alpha = 0.2
 pointer_size = 20
 output_path = 'data_p0_leg.csv'
 
@@ -98,9 +98,9 @@ class main_window(QWidget):
                 self.new_ema[i] = (
                     self.sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
             self.old_ema = self.new_ema
-        self.sensor_val = self.new_ema
+        self.n_sensor_val = self.new_ema
         #指数平均平滑フィルタ
-
+        '''
         a = self.sensor_val
         top_sensor = np.argsort(-a)
         sv_ydata = [top_sensor[i] for i in range(num_of_sensor) if i < 3]
@@ -114,7 +114,7 @@ class main_window(QWidget):
         
         for i in range(wait_flame-1):
             self.sensor_flt[i+1,:] = self.sensor_flt[i,:]
-        '''
+        
         max_val = np.max(self.sensor_val)
         near_snum = []
         for v in range(num_of_sensor):
