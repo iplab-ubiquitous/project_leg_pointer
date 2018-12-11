@@ -19,7 +19,8 @@ window_size_x, window_size_y = pyautogui.size()
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
 wait_flame = 100
-alpha = 0.095
+alpha = 0.1
+beta = 0.65
 pointer_size = 20
 ppi = 102.42  # 研究室のDELLのディスプレイ
 #ppi = 94.0   #家のディスプレイ(EV2455)
@@ -107,6 +108,9 @@ class main_window(QWidget):
         self.new_y = 0
         self.old_y = window_size_y / 2
 
+        #低速モード用フラグ
+        self.slower_mode = False
+
         #実験条件
         self.num_of_targets = 13  # ターゲット数
         self.radius = self.inch_to_pixel(1.0)  # 全体の円の直径
@@ -118,6 +122,9 @@ class main_window(QWidget):
         #ポインタ座標値
         self.x = 0
         self.y = 0
+        self.xplus = 0
+        self.yplus = 0
+
 
         #実験データ収集
         self.exp_timer_init()
@@ -321,7 +328,12 @@ class main_window(QWidget):
                 #self.target_point[self.collision_nums], self.target_radius, self.target_radius)
         #self.textbox_t.setText(str(self.collision_flag))
         painter.setBrush(Qt.red)
-        painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
+        if self.slower_mode: 
+            painter.drawEllipse(self.x+self.xplus,
+                                self.y+self.yplus, pointer_size, pointer_size)
+        else:
+            painter.drawEllipse(self.x,
+                                self.y, pointer_size, pointer_size)
 
 
     def keyPressEvent(self, keyevent):
@@ -340,12 +352,18 @@ class main_window(QWidget):
             self.miss_flag = False
             self.order_num += 1
             self.order_num = self.order_num % (self.num_of_targets+1)
-        if keyevent.key() == Qt.Key_Shift:
+        if keyevent.key() == Qt.Key_Control:
             QApplication.setOverrideCursor(self.cursor_hider)
             self.start = time.time()
             self.tstamp = time.time()
             self.exp_start_flag = True
             print("start")
+
+        if keyevent.key() == Qt.Key_Shift:
+            self.slower_mode = True
+    def keyReleaseEvent(self, keyevent):
+        if keyevent.key() == Qt.Key_Shift:
+            self.slower_mode = False
     #膝位置計算
     def pointer_calc(self, sensor_val, left_limit, right_limit, upper_limit, lower_limit, flag):
         x = 0
@@ -362,10 +380,9 @@ class main_window(QWidget):
             self.old_ema = self.new_ema
         sensor_val = self.new_ema
         #指数平均平滑フィルタ
-
+        n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         for i in range(wait_flame-1):
             self.sensor_flt[i+1,:] = self.sensor_flt[i,:]
-        n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         max_val = np.max(sensor_val)
         near_snum = []
         for v in range(num_of_sensor):
@@ -381,7 +398,6 @@ class main_window(QWidget):
             else:
                 n_sensor_val[v] = np.average(self.sensor_flt[[1, wait_flame-1], v])*0.9 + self.sensor_flt[0, v] * 0.1
                 
-        sensor_val = n_sensor_val
 
         if self.leg_flag:
             #y座標計算
@@ -412,7 +428,7 @@ class main_window(QWidget):
             if self.old_y == window_size_y / 2:
                 self.old_y = self.new_y
             else:
-                self.new_y = (self.new_y - self.old_y) * alpha + self.old_y
+                self.new_y = (self.new_y - self.old_y) * beta + self.old_y
                 self.old_y = self.new_y
 
             x = (window_size_x) * (self.new_x - left_limit) / \
@@ -507,10 +523,19 @@ class main_window(QWidget):
             if(pick > 3):
                 self.leg_flag = True
                 break
-        #膝検出
+        
         if self.calibration_check():
-            self.x, self.y = self.pointer_calc(
-                sensor_val, self.left_limit, self.right_limit, self.upper_limit, self.lower_limit, self.leg_flag)
+            if self.slower_mode:
+                x, y = self.pointer_calc(
+                    sensor_val, self.left_limit, self.right_limit, self.upper_limit, self.lower_limit, self.leg_flag)
+                self.xplus = int(((x - self.x) / window_size_x) * 100)
+                self.yplus = int(((y - self.y) / window_size_y) * 100)
+                print(self.xplus, self.yplus)
+                
+                
+            else:
+                self.x, self.y = self.pointer_calc(
+                    sensor_val, self.left_limit, self.right_limit, self.upper_limit, self.lower_limit, self.leg_flag)
 
         #衝突判定
         self.collision_flag = ((self.x - self.target_point[self.target_order[self.order_num]].x()) * (self.x - self.target_point[self.target_order[self.order_num]].x())) + (

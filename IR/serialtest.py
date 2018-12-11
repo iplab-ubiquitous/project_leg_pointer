@@ -17,7 +17,7 @@ window_size_y = 1080
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
 wait_flame = 100
-alpha = 0.2
+alpha = 0.1
 pointer_size = 20
 output_path = 'data_p0_leg.csv'
 
@@ -67,10 +67,17 @@ class main_window(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.value_upd)
         self.timer.start(5)  # 200fps以下
-        
 
-    #実験データ収集用
-    #操作時間計測
+        self.val = [0] *10
+        
+        for i in range(num_of_sensor):
+            self.val[i] = QLineEdit(self)
+            self.val[i].move(window_size_x / 12 * (i+1), 100)
+            self.val[i].resize(100, 20)
+
+
+        #実験データ収集用
+        #操作時間計測
 
 
     def paintEvent(self, QPaintEvent):
@@ -81,6 +88,7 @@ class main_window(QWidget):
         for i in range(num_of_sensor):
             painter.drawRect(window_size_x / 12 * (i+1), window_size_y -
                              (self.n_sensor_val[i])*10-100, 40,  (self.n_sensor_val[i])*10)
+            self.val[i].setText(str(round(self.n_sensor_val[i], 2)))
 
 
     def value_upd(self):
@@ -98,7 +106,14 @@ class main_window(QWidget):
                 self.new_ema[i] = (
                     self.sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
             self.old_ema = self.new_ema
-        self.n_sensor_val = self.new_ema
+
+        for i in range(num_of_sensor):
+            if abs(self.new_ema[i] - self.n_sensor_val[i]) > 20 and abs(self.new_ema[i] - self.n_sensor_val[i]) < 40:
+                self.n_sensor_val[i] = self.n_sensor_val[i]
+            elif self.new_ema[i] < 36:
+                self.n_sensor_val[i] = 0.3 * self.new_ema[i]
+            else:
+                self.n_sensor_val[i] = self.new_ema[i]
         #指数平均平滑フィルタ
         '''
         a = self.sensor_val

@@ -116,7 +116,7 @@ class main_window(QWidget):
         self.button_up_calb.setText("キャリブレーション:上")
         self.button_up_calb.clicked.connect(self.calibration_up)
         self.up_calb_flag = False
-        self.upper_limit = window_size_y
+        self.upper_limit = 0
 
         #キャリブレーション:下
         self.button_down_calb = QPushButton(self)
@@ -124,7 +124,7 @@ class main_window(QWidget):
         self.button_down_calb.setText("キャリブレーション:下")
         self.button_down_calb.clicked.connect(self.calibration_down)
         self.down_calb_flag = False
-        self.lower_limit = 0
+        self.lower_limit = 64
 
         #リセット
         self.button_reset = QPushButton(self)
@@ -203,7 +203,7 @@ class main_window(QWidget):
         if self.leg_flag:
             #y座標計算
             top_sensor = np.argsort(-sensor_val)
-            self.new_y = (max(sensor_val)-52)
+            self.new_y = max(sensor_val)
             #self.new_y = (window_size_y) * (59.0-max(sensor_val)) / 59.0-52.0
             #self.new_y = (window_size_y) * (59.0 - sensor_val[int(np.median(near_snum))]) / 59.0-52.0
             #self.new_y = (window_size_y) * (59.0 - np.average([sensor_val[v] for v in near_snum])) / 59.0-52.0
@@ -243,8 +243,14 @@ class main_window(QWidget):
                 self.left_limit = self.new_x
             if self.new_x > self.right_limit:
                 self.right_limit = self.new_x
-            print([self.left_limit, self.right_limit, self.new_x])
+            
 
+            
+            if self.new_y > self.upper_limit:
+                self.upper_limit = self.new_y
+            if self.new_y < self.lower_limit and self.lower_limit - self.new_y < 32:
+                self.lower_limit = self.new_y
+            print([self.lower_limit, self.upper_limit, self.new_y])
 
             
             if self.new_x < (self.right_limit-self.left_limit) * 1/9 + self.left_limit:
@@ -265,9 +271,28 @@ class main_window(QWidget):
                 x = 9
             else:
                 x = 16
+
+            if self.new_y < (self.upper_limit-self.lower_limit) * 1/9 + self.lower_limit:
+                y = 16
+            elif self.new_y < (self.upper_limit-self.lower_limit) * 2/9 + self.lower_limit:
+                y = 9
+            elif self.new_y < (self.upper_limit-self.lower_limit) * 3/9 + self.lower_limit:
+                y = 1
+            elif self.new_y < (self.upper_limit-self.lower_limit) * 4/9 + self.lower_limit:
+                y = 0
+            elif self.new_y < (self.upper_limit-self.lower_limit) * 5/9 + self.lower_limit:
+                y = 0
+            elif self.new_y < (self.upper_limit-self.lower_limit) * 6/9 + self.lower_limit:
+                y = 0
+            elif self.new_y < (self.upper_limit-self.lower_limit) * 7/9 + self.lower_limit:
+                y = -4
+            elif self.new_y < (self.upper_limit-self.lower_limit) * 8/9 + self.lower_limit:
+                y = -9
+            else:
+                y = -16
             
 
-        return x
+        return x, y
 
     #左方向キャリブレーション
     def calibration_left(self):
@@ -355,9 +380,20 @@ class main_window(QWidget):
                 break
         #膝検出
         if self.calibration_check():
-            y = self.pointer_calc(
+            x, y = self.pointer_calc(
                 sensor_val, self.leg_flag)
-            self.y += y
+            if self.x + x > window_size_x:
+                self.x = window_size_x
+            elif self.x + x < 0:
+                self.x = 0
+            else:
+                self.x += x
+            if self.y + y > window_size_y:
+                self.y = window_size_y
+            elif self.y + y < 0:
+                self.y = 0
+            else:
+                self.y += y
 
         #衝突判定
         self.update()
