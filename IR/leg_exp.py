@@ -122,8 +122,8 @@ class main_window(QWidget):
         #ポインタ座標値
         self.x = 0
         self.y = 0
-        self.xplus = 0
-        self.yplus = 0
+        self.xs= 0
+        self.ys = 0
 
 
         #実験データ収集
@@ -328,12 +328,7 @@ class main_window(QWidget):
                 #self.target_point[self.collision_nums], self.target_radius, self.target_radius)
         #self.textbox_t.setText(str(self.collision_flag))
         painter.setBrush(Qt.red)
-        if self.slower_mode: 
-            painter.drawEllipse(self.x+self.xplus,
-                                self.y+self.yplus, pointer_size, pointer_size)
-        else:
-            painter.drawEllipse(self.x,
-                                self.y, pointer_size, pointer_size)
+        painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
 
 
     def keyPressEvent(self, keyevent):
@@ -361,13 +356,15 @@ class main_window(QWidget):
 
         if keyevent.key() == Qt.Key_Shift:
             self.slower_mode = True
+            self.xs = self.x
+            self.ys = self.y
     def keyReleaseEvent(self, keyevent):
         if keyevent.key() == Qt.Key_Shift:
             self.slower_mode = False
+            self.x = self.xs
+            self.y = self.ys
     #膝位置計算
     def pointer_calc(self, sensor_val, left_limit, right_limit, upper_limit, lower_limit, flag):
-        x = 0
-        y = 0
         #print(left_limit, right_limit, upper_limit, lower_limit)
 
         #指数平均平滑フィルタ
@@ -402,7 +399,7 @@ class main_window(QWidget):
         if self.leg_flag:
             #y座標計算
             top_sensor = np.argsort(-sensor_val)
-            self.new_y = (window_size_y) * (59.0-max(sensor_val)) / 59.0-52.0
+            self.new_y = (window_size_y) * (59.0-max(sensor_val)) / (59.0-52.0)
             #self.new_y = (window_size_y) * (59.0 - sensor_val[int(np.median(near_snum))]) / 59.0-52.0
             #self.new_y = (window_size_y) * (59.0 - np.average([sensor_val[v] for v in near_snum])) / 59.0-52.0
 
@@ -431,12 +428,15 @@ class main_window(QWidget):
                 self.new_y = (self.new_y - self.old_y) * beta + self.old_y
                 self.old_y = self.new_y
 
-            x = (window_size_x) * (self.new_x - left_limit) / \
-                (right_limit-left_limit)
-            y = (window_size_y) * (self.new_y - upper_limit) / \
-                (lower_limit-upper_limit)
-        return x, y
+            self.new_x = self.my_map(
+                self.new_x, window_size_x, left_limit, right_limit)
+            self.new_y = self.my_map(
+                self.new_y, window_size_y, upper_limit, lower_limit)
+        return self.new_x, self.new_y
 
+
+    def my_map(self, val, mag, smaller, larger):
+        return mag * (val - smaller) / (larger - smaller)
     #左方向キャリブレーション
     def calibration_left(self):
         x = 0
@@ -528,15 +528,13 @@ class main_window(QWidget):
             if self.slower_mode:
                 x, y = self.pointer_calc(
                     sensor_val, self.left_limit, self.right_limit, self.upper_limit, self.lower_limit, self.leg_flag)
-                self.xplus = int(((x - self.x) / window_size_x) * 100)
-                self.yplus = int(((y - self.y) / window_size_y) * 100)
-                print(self.xplus, self.yplus)
+                self.x = self.xs + int(((x - self.xs) / window_size_x) * 100)
+                self.y = self.ys + int(((y - self.ys) / window_size_y) * 100)
                 
                 
             else:
                 self.x, self.y = self.pointer_calc(
                     sensor_val, self.left_limit, self.right_limit, self.upper_limit, self.lower_limit, self.leg_flag)
-
         #衝突判定
         self.collision_flag = ((self.x - self.target_point[self.target_order[self.order_num]].x()) * (self.x - self.target_point[self.target_order[self.order_num]].x())) + (
             (self.y - self.target_point[self.target_order[self.order_num]].y()) * (self.y - self.target_point[self.target_order[self.order_num]].y())) <= (self.target_radius + pointer_size) * (self.target_radius + pointer_size)
