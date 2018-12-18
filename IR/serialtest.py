@@ -107,11 +107,10 @@ class main_window(QWidget):
                     self.sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
             self.old_ema = self.new_ema
 
+        
         for i in range(num_of_sensor):
-            if abs(self.new_ema[i] - self.n_sensor_val[i]) > 20 and abs(self.new_ema[i] - self.n_sensor_val[i]) < 40:
-                self.n_sensor_val[i] = self.n_sensor_val[i]
-            elif self.new_ema[i] < 36:
-                self.n_sensor_val[i] = 0.3 * self.new_ema[i]
+            if self.new_ema[i] < 25:
+                self.n_sensor_val[i] =0
             else:
                 self.n_sensor_val[i] = self.new_ema[i]
         #指数平均平滑フィルタ

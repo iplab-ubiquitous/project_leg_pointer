@@ -19,10 +19,13 @@ window_size_x, window_size_y = pyautogui.size()
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
 wait_flame = 100
-alpha = 0.095
+alpha = 0.1
+beta = 0.65
 pointer_size = 20
 ppi = 102.42  # 研究室のDELLのディスプレイ
 #ppi = 94.0   #家のディスプレイ(EV2455)
+pyautogui.FAILSAFE = True
+pyautogui.PAUSE = 0.001
 
 output_path_log = 'exp_data/leg/log_p1_leg.csv'
 output_path_data = 'exp_data/leg/data_p1_leg.csv'
@@ -110,21 +113,31 @@ class main_window(QWidget):
         self.right_calb_flag = False
         self.right_limit = 0
 
+        #キャリブレーション:真中
+        self.button_center_calb = QPushButton(self)
+        self.button_center_calb.move(100, 100)
+        self.button_center_calb.setText("キャリブレーション:真中")
+        self.button_center_calb.clicked.connect(self.calibration_center)
+        self.center_calb_flag = False
+        self.center_posx = 0
+        self.center_posy = 0
+
         #キャリブレーション:上
         self.button_up_calb = QPushButton(self)
-        self.button_up_calb.move(0, 100)
+        self.button_up_calb.move(0, 150)
         self.button_up_calb.setText("キャリブレーション:上")
         self.button_up_calb.clicked.connect(self.calibration_up)
         self.up_calb_flag = False
-        self.upper_limit = 0
+        self.upper_limit = window_size_y
 
         #キャリブレーション:下
         self.button_down_calb = QPushButton(self)
-        self.button_down_calb.move(200, 100)
+        self.button_down_calb.move(200, 150)
         self.button_down_calb.setText("キャリブレーション:下")
         self.button_down_calb.clicked.connect(self.calibration_down)
         self.down_calb_flag = False
-        self.lower_limit = 64
+        self.lower_limit = 0
+
 
         #リセット
         self.button_reset = QPushButton(self)
@@ -162,11 +175,11 @@ class main_window(QWidget):
         painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
     #膝位置計算
 
-    def pointer_calc(self, sensor_val, flag):
-        x = 0
-        y = 0
+    def my_map(self, val, in_min, in_max, out_min, out_max):
+        return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+    def pointer_calc(self, sensor_val):
         #print(left_limit, right_limit, upper_limit, lower_limit)
-        
+
         #指数平均平滑フィルタ
         if np.allclose(self.old_ema, np.zeros(num_of_sensor, dtype=np.float)):
             self.old_ema = sensor_val
@@ -177,11 +190,9 @@ class main_window(QWidget):
             self.old_ema = self.new_ema
         sensor_val = self.new_ema
         #指数平均平滑フィルタ
-
-        
+        n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         for i in range(wait_flame-1):
             self.sensor_flt[i+1, :] = self.sensor_flt[i, :]
-        n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         max_val = np.max(sensor_val)
         near_snum = []
         for v in range(num_of_sensor):
@@ -198,13 +209,10 @@ class main_window(QWidget):
                 n_sensor_val[v] = np.average(
                     self.sensor_flt[[1, wait_flame-1], v])*0.9 + self.sensor_flt[0, v] * 0.1
 
-        sensor_val = n_sensor_val
-
         if self.leg_flag:
             #y座標計算
             top_sensor = np.argsort(-sensor_val)
-            self.new_y = max(sensor_val)
-            #self.new_y = (window_size_y) * (59.0-max(sensor_val)) / 59.0-52.0
+            self.new_y = (window_size_y) * (59.0-max(sensor_val)) / (59.0-52.0)
             #self.new_y = (window_size_y) * (59.0 - sensor_val[int(np.median(near_snum))]) / 59.0-52.0
             #self.new_y = (window_size_y) * (59.0 - np.average([sensor_val[v] for v in near_snum])) / 59.0-52.0
 
@@ -217,10 +225,9 @@ class main_window(QWidget):
             s = sum(self.weight)
             self.new_x = -2
             for j in range(num_of_sensor):
-                self.new_x += ((j * self.weight[j] / s) * 3)
-            #self.new_x *= (window_size_x / 9)
+                self.new_x += ((j * self.weight[j] / s) * 1.5)
+            self.new_x *= (window_size_x / 9)
 
-            '''
             #座標平滑フィルタ
             if self.old_x == window_size_x / 2:
                 self.old_x = self.new_x
@@ -231,79 +238,19 @@ class main_window(QWidget):
             if self.old_y == window_size_y / 2:
                 self.old_y = self.new_y
             else:
-                self.new_y = (self.new_y - self.old_y) * alpha + self.old_y
+                self.new_y = (self.new_y - self.old_y) * beta + self.old_y
                 self.old_y = self.new_y
-            '''
 
-            #x = (window_size_x) * (self.new_x - left_limit) / \
-            #    (right_limit-left_limit)
-            #y = (window_size_y) * (self.new_y - upper_limit) / \
-            #    (lower_limit-upper_limit)
-            if self.new_x < self.left_limit:
-                self.left_limit = self.new_x
-            if self.new_x > self.right_limit:
-                self.right_limit = self.new_x
-            
-
-            
-            if self.new_y > self.upper_limit:
-                self.upper_limit = self.new_y
-            if self.new_y < self.lower_limit and self.lower_limit - self.new_y < 32:
-                self.lower_limit = self.new_y
-            print([self.lower_limit, self.upper_limit, self.new_y])
-
-            
-            if self.new_x < (self.right_limit-self.left_limit) * 1/9 + self.left_limit:
-                x = -16
-            elif self.new_x < (self.right_limit-self.left_limit) * 2/9 + self.left_limit:
-                x = -9
-            elif self.new_x < (self.right_limit-self.left_limit) * 3/9 + self.left_limit:
-                x = -4
-            elif self.new_x < (self.right_limit-self.left_limit) * 4/9 + self.left_limit:
-                x = -1
-            elif self.new_x < (self.right_limit-self.left_limit) * 5/9 + self.left_limit:
-                x = 0
-            elif self.new_x < (self.right_limit-self.left_limit) * 6/9 + self.left_limit:
-                x = 1
-            elif self.new_x < (self.right_limit-self.left_limit) * 7/9 + self.left_limit:
-                x = 4
-            elif self.new_x < (self.right_limit-self.left_limit) * 8/9 + self.left_limit:
-                x = 9
-            else:
-                x = 16
-
-            if self.new_y < (self.upper_limit-self.lower_limit) * 1/9 + self.lower_limit:
-                y = 16
-            elif self.new_y < (self.upper_limit-self.lower_limit) * 2/9 + self.lower_limit:
-                y = 9
-            elif self.new_y < (self.upper_limit-self.lower_limit) * 3/9 + self.lower_limit:
-                y = 1
-            elif self.new_y < (self.upper_limit-self.lower_limit) * 4/9 + self.lower_limit:
-                y = 0
-            elif self.new_y < (self.upper_limit-self.lower_limit) * 5/9 + self.lower_limit:
-                y = 0
-            elif self.new_y < (self.upper_limit-self.lower_limit) * 6/9 + self.lower_limit:
-                y = 0
-            elif self.new_y < (self.upper_limit-self.lower_limit) * 7/9 + self.lower_limit:
-                y = -4
-            elif self.new_y < (self.upper_limit-self.lower_limit) * 8/9 + self.lower_limit:
-                y = -9
-            else:
-                y = -16
-            
-
-        return x, y
-
+        return self.new_x, self.new_y
     #左方向キャリブレーション
     def calibration_left(self):
         x = 0
         y = 0
         if not self.left_calb_flag:
-            for i in range(200):
+            for i in range(100):
                 tmp = rd.read_test_ser()
                 val = [64-float(v) for v in tmp]
-                x, y = self.pointer_calc(
-                    val, 0, window_size_x, 0, window_size_y, True)
+                x, y = self.pointer_calc(val)
             self.left_limit = x
             #print(lst)
             self.left_calb_flag = True
@@ -314,14 +261,27 @@ class main_window(QWidget):
         x = 0
         y = 0
         if not self.right_calb_flag:
-            for i in range(200):
+            for i in range(100):
                 tmp = rd.read_test_ser()
                 val = [64-float(v) for v in tmp]
-                x, y = self.pointer_calc(
-                    val, 0, window_size_x, 0, window_size_y, True)
+                x, y = self.pointer_calc(val)
             self.right_limit = x
             #print(lst)
             self.right_calb_flag = True
+            self.ema_reset()
+    #真中キャリブレーション
+    def calibration_center(self):
+        x = 0
+        y = 0
+        if not self.center_calb_flag:
+            for i in range(100):
+                tmp = rd.read_test_ser()
+                val = [64-float(v) for v in tmp]
+                x, y = self.pointer_calc(val)
+            self.center_posx = x
+            self.center_posy = y
+            #print(lst)
+            self.center_calb_flag = True
             self.ema_reset()
 
     #上方向キャリブレーション
@@ -329,11 +289,10 @@ class main_window(QWidget):
         x = 0
         y = 0
         if not self.up_calb_flag:
-            for i in range(200):
+            for i in range(100):
                 tmp = rd.read_test_ser()
                 val = [64-float(v) for v in tmp]
-                x, y = self.pointer_calc(
-                    val, 0, window_size_x, 0, window_size_y, True)
+                x, y = self.pointer_calc(val)
             self.upper_limit = y
             #print(lst)
             self.up_calb_flag = True
@@ -344,11 +303,10 @@ class main_window(QWidget):
         x = 0
         y = 0
         if not self.down_calb_flag:
-            for i in range(200):
+            for i in range(100):
                 tmp = rd.read_test_ser()
                 val = [64-float(v) for v in tmp]
-                x, y = self.pointer_calc(
-                    val, 0, window_size_x, 0, window_size_y, True)
+                x, y = self.pointer_calc(val)
             self.lower_limit = y
             #print(lst)
             self.down_calb_flag = True
@@ -362,6 +320,7 @@ class main_window(QWidget):
         self.right_calb_flag = True
         self.up_calb_flag = True
         self.down_calb_flag = True
+
 
     def value_upd(self):
         #print(self.left_limit, self.right_limit,self.upper_limit, self.lower_limit)
@@ -378,25 +337,44 @@ class main_window(QWidget):
             if(pick > 3):
                 self.leg_flag = True
                 break
-        #膝検出
-        if self.calibration_check():
-            x, y = self.pointer_calc(
-                sensor_val, self.leg_flag)
-            if self.x + x > window_size_x:
-                self.x = window_size_x
-            elif self.x + x < 0:
-                self.x = 0
-            else:
-                self.x += x
-            if self.y + y > window_size_y:
-                self.y = window_size_y
-            elif self.y + y < 0:
-                self.y = 0
-            else:
-                self.y += y
 
-        #衝突判定
-        self.update()
+        if self.calibration_check():
+            '''
+            if self.slower_mode:
+                x, y = self.pointer_calc(
+                    sensor_val, self.left_limit, self.right_limit, self.upper_limit, self.lower_limit, self.leg_flag)
+                self.x = self.xs + int(((x - self.xs) / window_size_x) * 100)
+                self.y = self.ys + int(((y - self.ys) / window_size_y) * 100)
+
+
+            else:
+            '''
+            if self.calibration_check():
+                self.new_x, self.new_y = self.pointer_calc(sensor_val)
+                if self.new_x < self.center_posx:
+                    self.x = self.my_map(
+                        self.new_x, self.left_limit, self.center_posx, 0, window_size_x/2)
+                else:
+                    self.x = self.my_map(
+                        self.new_x, self.center_posx, self.right_limit, window_size_x/2, window_size_x)
+
+                if self.new_y < self.center_posy:
+                    self.y = self.my_map(
+                        self.new_y, self.upper_limit, self.center_posy, 0, window_size_y/2)
+                else:
+                    self.y = self.my_map(
+                        self.new_y, self.center_posy, self.lower_limit, window_size_y/2, window_size_y)
+
+                if self.x < 0:
+                    self.x = 0
+                elif self.x > window_size_x:
+                    self.x = window_size_x
+                if self.y < 0:
+                    self.y = 0
+                elif self.y > window_size_y:
+                    self.y = window_size_y
+                pyautogui.moveTo(self.x, self.y)
+                self.update()
     def main(self):
         self.show()
         app.exec_()
