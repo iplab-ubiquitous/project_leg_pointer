@@ -96,6 +96,7 @@ class main_window(QWidget):
         #print(self.left_limit, self.right_limit,self.upper_limit, self.lower_limit)
         tmp = rd.read_test_ser()
         self.sensor_val = [64-float(v) for v in tmp]
+        
 
 
         #指数平均平滑フィルタ

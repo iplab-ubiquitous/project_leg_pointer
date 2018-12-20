@@ -411,7 +411,7 @@ class main_window(QWidget):
         if self.leg_flag:
             #y座標計算
             top_sensor = np.argsort(-sensor_val)
-            self.new_y = (window_size_y) * (59.0-max(sensor_val)) / (59.0-52.0)
+            self.new_y = max(sensor_val)
             #self.new_y = (window_size_y) * (59.0 - sensor_val[int(np.median(near_snum))]) / 59.0-52.0
             #self.new_y = (window_size_y) * (59.0 - np.average([sensor_val[v] for v in near_snum])) / 59.0-52.0
 
@@ -425,7 +425,6 @@ class main_window(QWidget):
             self.new_x = -2
             for j in range(num_of_sensor):
                 self.new_x += ((j * self.weight[j] / s) * 1.5)
-            self.new_x *= (window_size_x / 9)
 
             #座標平滑フィルタ
             if self.old_x == window_size_x / 2:
