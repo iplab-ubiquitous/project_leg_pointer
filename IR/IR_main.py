@@ -33,7 +33,7 @@ output_path_data = 'exp_data/leg/data_p1_leg.csv'
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem14201', 460800)
+        self.ser = serial.Serial('/dev/cu.usbmodem143201', 460800)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -221,10 +221,10 @@ class main_window(QWidget):
             for i in range(num_of_sensor):
                 self.weight[i] = 1 / (max(sensor_val) - sensor_val[i] + 2)
             s = sum(self.weight)
-
+            self.new_x = 0
             for j in range(num_of_sensor):
                 self.new_x += ((j * self.weight[j] / s))
-            print(self.new_x)
+            #print(self.new_x)
 
             #座標平滑フィルタ
             if self.old_x == window_size_x / 2:

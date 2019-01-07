@@ -13,8 +13,8 @@ import numpy as np
 import random
 import time
 
-window_size_x = 1920
-window_size_y = 1080
+window_size_x = 1440      
+window_size_y = 900
 window_size_x, window_size_y = pyautogui.size()
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
@@ -25,13 +25,13 @@ pointer_size = 20
 ppi = 102.42  # 研究室のDELLのディスプレイ
 #ppi = 94.0   #家のディスプレイ(EV2455)
 
-output_path_log = 'exp_data/leg/log_p1_leg.csv'
-output_path_data = 'exp_data/leg/data_p0_0_leg.csv'
+output_path_log = 'exp_data/leg/log_p1_r3_leg.csv'
+output_path_data = 'exp_data/leg/data_p1_r3_leg.csv'
 
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem14201', 460800)
+        self.ser = serial.Serial('/dev/cu.usbmodem143201', 460800)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -143,6 +143,10 @@ class main_window(QWidget):
         #self.collision_num = 0
         self.set_target()
 
+        #実験条件
+        self.condition = [[2.0, 1.0], [2.0, 1.5], [2.0, 0.5], [5.0, 1.0], [5.0, 1.5], [5.0, 0.5], [8.0, 1.0], [8.0, 1.5], [8.0, 0.5]]
+        random.shuffle(self.condition)
+
         
         #nカウントごとにタイムアウト、タイムアウト時に任意の関数を呼び出す
         self.timer = QTimer(self)
@@ -229,13 +233,14 @@ class main_window(QWidget):
 
         #全体の円の半径 = radius の変更(初期値:300)
         self.radius_label = QLabel(self)
-        self.radius_label.setText("D = ")
+        self.radius_label.setText("タスク番号")
         self.radius_label.move(350, 0)
         self.set_radius = QLineEdit(self)
         self.set_radius.move(350, 20)
         self.set_radius.setText(str(self.pixel_to_inch(self.radius)))
         self.set_radius.resize(100, 20)
 
+        '''
         #ターゲット数 = target_radius の変更(初期値:40)
         self.target_radius_label = QLabel(self)
         self.target_radius_label.setText("W = ")
@@ -245,11 +250,12 @@ class main_window(QWidget):
         self.set_target_radius.setText(
             str(self.pixel_to_inch(self.target_radius)))
         self.set_target_radius.resize(100, 20)
+        '''
 
         #実験条件の変更の反映
         self.button_exec = QPushButton(self)
         self.button_exec.move(700, 20)
-        self.button_exec.setText("設定")
+        self.button_exec.setText("Next")
         self.button_exec.clicked.connect(self.set_target_config)
 
         self.cursor_hider = QCursor(QPixmap("bitmap.png"))
@@ -295,18 +301,21 @@ class main_window(QWidget):
 
 
     def set_target_config(self):
+        if self.exp_end_flag:
+            self.exp_num += 1
+            self.exp_end_flag = False
+            if self.exp_num == 9:
+                exit(1)
         self.num_of_targets = int(self.set_num_of_target.text())
-        self.radius = self.inch_to_pixel(float(self.set_radius.text())/2)
-        self.target_radius = self.inch_to_pixel(float(self.set_target_radius.text())/2)
+        self.radius = self.inch_to_pixel(self.condition[self.exp_num][0]/2)
+        self.target_radius = self.inch_to_pixel(self.condition[self.exp_num][1]/2)
         self.set_target()
         self.exp_timer_init()
         
         self.clicked = 0
         self.miss = 0
         self.miss_flag = False
-        if self.exp_end_flag:
-            self.exp_num += 1
-            self.exp_end_flag = False
+ 
         self.update()
 
 
@@ -314,6 +323,7 @@ class main_window(QWidget):
         painter = QPainter(self)
         self.textbox_x.setText(str(int(self.x)))  # 座標確認用
         self.textbox_y.setText(str(int(self.y)))  # 座標確認用
+        self.set_radius.setText(str(self.exp_num))
         painter.setPen(Qt.black)
         #painter.setBrush(Qt.red)
         #painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
@@ -357,11 +367,12 @@ class main_window(QWidget):
             self.order_num += 1
             self.order_num = self.order_num % (self.num_of_targets+1)
         if keyevent.key() == Qt.Key_Control:
-            QApplication.setOverrideCursor(self.cursor_hider)
-            self.start = time.time()
-            self.tstamp = time.time()
-            self.exp_start_flag = True
-            print("start")
+            if not self.exp_end_flag:
+                QApplication.setOverrideCursor(self.cursor_hider)
+                self.start = time.time()
+                self.tstamp = time.time()
+                self.exp_start_flag = True
+                print("start")
 
         if keyevent.key() == Qt.Key_Shift:
             self.slower_mode = True
@@ -422,9 +433,10 @@ class main_window(QWidget):
             for i in range(num_of_sensor):
                 self.weight[i] = 1 / (max(sensor_val) - sensor_val[i] + 2)
             s = sum(self.weight)
-            self.new_x = -2
+            self.new_x = 0
             for j in range(num_of_sensor):
-                self.new_x += ((j * self.weight[j] / s) * 1.5)
+                self.new_x += ((j * self.weight[j] / s))
+            #print(self.new_x)
 
             #座標平滑フィルタ
             if self.old_x == window_size_x / 2:

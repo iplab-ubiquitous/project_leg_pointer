@@ -11,8 +11,8 @@ import numpy as np
 import random
 import time
 
-window_size_x = 1920    
-window_size_y = 1080
+window_size_x = 1440        
+window_size_y = 900
 #window_size = QtGui.qApp.desktop().width()
 pointer_size = 20
 ppi = 102.42 #研究室のDELLのディスプレイ
