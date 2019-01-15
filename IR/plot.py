@@ -20,7 +20,11 @@ import_file = import_file[np.argsort(import_file[:, 4])]
 delta_t = import_file[:, 2]
 d_id = import_file[:, 4]
 err = sum(import_file[:, 5]) / len(import_file[:,5])
-we = np.array([0.5, 1.0, 1.5]) * 2.066 / norm.ppf(1-err/2)
+we = np.array([0.5, 1.0, 1.5])
+if err > 0.000049:
+        we = we * 2.066 / norm.ppf(1-err/2)
+else:
+        we = we * 0.5089
 dis = np.array([2.0, 5.0, 8.0])
 print("W(e) = " + str(we))
 d_id_e = np.empty(0)
@@ -35,7 +39,7 @@ print("ID(e) = " + str(d_id_e))
 
 d_id_e_pred = np.empty(0)
 for i in range(d_id_e.shape[0]):
-    for j in range(13*1):
+    for j in range(13*3*3):
         d_id_e_pred = np.append(d_id_e_pred, d_id_e[i])
 
 
@@ -65,16 +69,22 @@ print(pred_time)
 print("r2 = " + str(r2_score(true_time, pred_time)))
 
 
-'''
-p = np.poly1d(fitted)
-p30 = np.poly1d(np.polyfit(d_id, delta_t, 30))
-xp = np.linspace(0, 10, 100)
+xp = np.linspace(0, 5, 5)
+p = np.poly1d(fitted)(xp)
 
 
-plt.plot(d_id, delta_t, '.')
+plt.figure(figsize=(10, 5))
+plt.title("Left Leg")
+plt.xlabel("ID = log(D/W + 1) [bit/s]")
+plt.ylabel("Moving Time [s]")
+plt.scatter(d_id, delta_t, s=5, c='red', label='selection time')
+plt.plot(xp, p, label="predict time")
+plt.legend(bbox_to_anchor=(1, 1), loc='lower right',
+           borderaxespad=0, fontsize=10)
 #plt.xlim(0, 1920)
-plt.ylim(1,5)
+plt.ylim(0,9)
+plt.xlim(1.0,4.5)
 plt.show()
 plt.savefig('image.png')
-'''
+
 

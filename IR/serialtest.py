@@ -12,8 +12,8 @@ import numpy as np
 import random
 import time
 
-window_size_x = 1440
-window_size_y = 900
+window_size_x = 1920    
+window_size_y = 1080
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
 wait_flame = 100
@@ -111,7 +111,7 @@ class main_window(QWidget):
 
         
         for i in range(num_of_sensor):
-            if self.new_ema[i] < 25:
+            if self.new_ema[i] < 0:
                 self.n_sensor_val[i] =0
             else:
                 self.n_sensor_val[i] = self.new_ema[i]

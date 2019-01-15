@@ -13,8 +13,8 @@ import numpy as np
 import random
 import time
 
-window_size_x = 1440      
-window_size_y = 900
+window_size_x = 1920         
+window_size_y = 1080
 window_size_x, window_size_y = pyautogui.size()
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
@@ -25,9 +25,8 @@ pointer_size = 20
 ppi = 102.42  # 研究室のDELLのディスプレイ
 #ppi = 94.0   #家のディスプレイ(EV2455)
 
-output_path_log = 'exp_data/leg/log_p1_r3_leg.csv'
-output_path_data = 'exp_data/leg/data_p1_r3_leg.csv'
-
+output_path_log = 'exp_data/leg/log_p3_l3_leg.csv'
+output_path_data = 'exp_data/leg/data_p3_l3_leg.csv'
 
 class sensor_read:
     def __init__(self):
@@ -306,6 +305,7 @@ class main_window(QWidget):
             self.exp_end_flag = False
             if self.exp_num == 9:
                 exit(1)
+        print(self.exp_num)
         self.num_of_targets = int(self.set_num_of_target.text())
         self.radius = self.inch_to_pixel(self.condition[self.exp_num][0]/2)
         self.target_radius = self.inch_to_pixel(self.condition[self.exp_num][1]/2)
@@ -375,9 +375,8 @@ class main_window(QWidget):
                 print("start")
 
         if keyevent.key() == Qt.Key_Shift:
-            self.slower_mode = True
-            self.xs = self.x
-            self.ys = self.y
+            self.set_target_config()
+
     def keyReleaseEvent(self, keyevent):
         if keyevent.key() == Qt.Key_Shift:
             self.slower_mode = False
