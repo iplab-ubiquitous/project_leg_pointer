@@ -1,11 +1,6 @@
 #PyQt
 import sys
 import math
-from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton,
-                             QGridLayout, QSizePolicy, QLineEdit,
-                             QLineEdit, QDialog, QLabel)
-from PyQt5.QtGui import QPainter, QFont, QColor, QCursor, QPixmap
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QPoint
 #PySerial
 import serial
 import pyautogui
@@ -13,8 +8,10 @@ import numpy as np
 import random
 import time
 
-window_size_x = 1920
-window_size_y = 1080
+from pynput.keyboard import Key, Listener
+
+window_size_x = 1440
+window_size_y = 900
 window_size_x, window_size_y = pyautogui.size()
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
@@ -33,7 +30,7 @@ output_path_data = 'exp_data/leg/data_p1_leg.csv'
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem143201', 460800)
+        self.ser = serial.Serial('/dev/cu.usbmodem141201', 460800)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -48,7 +45,7 @@ class sensor_read:
         return lst
 
 
-class main_window(QWidget):
+class move_mouse:
 
     #膝位置計算用変数リセット
     def value_init(self):
@@ -66,7 +63,7 @@ class main_window(QWidget):
 
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        #super().__init__(parent)
         #膝検出・位置計算用
         self.sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         self.weight = ([1.00] * num_of_sensor)
@@ -83,86 +80,23 @@ class main_window(QWidget):
         self.old_y = window_size_y / 2
 
 
-        #ウィンドウサイズ
-        self.resize(window_size_x, window_size_y)
-
         #ポインタ座標値
         self.x = 0
         self.y = 0
+        self.left_limit = 3.50
+        self.right_limit = 6.98
+        self.center_posx = 4.99
+        self.center_posy = 52.5
+        self.upper_limit = 57.0
+        self.lower_limit = 49.4
 
-
-
-        #nカウントごとにタイムアウト、タイムアウト時に任意の関数を呼び出す
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.value_upd)
-        self.timer.start(5)  # 200fps以下
-
-        #キャリブレーション:左
-        self.button_left_calb = QPushButton(self)
-        self.button_left_calb.move(0, 50)
-        self.button_left_calb.setText("キャリブレーション:左")
-        self.button_left_calb.clicked.connect(self.calibration_left)
-        self.left_calb_flag = False
-        self.left_limit = window_size_x
-
-        #キャリブレーション:右
-        self.button_right_calb = QPushButton(self)
-        self.button_right_calb.move(200, 50)
-        self.button_right_calb.setText("キャリブレーション:右")
-        self.button_right_calb.clicked.connect(self.calibration_right)
-        self.right_calb_flag = False
-        self.right_limit = 0
-
-        #キャリブレーション:真中
-        self.button_center_calb = QPushButton(self)
-        self.button_center_calb.move(100, 100)
-        self.button_center_calb.setText("キャリブレーション:真中")
-        self.button_center_calb.clicked.connect(self.calibration_center)
-        self.center_calb_flag = False
-        self.center_posx = 0
-        self.center_posy = 0
-
-        #キャリブレーション:上
-        self.button_up_calb = QPushButton(self)
-        self.button_up_calb.move(0, 150)
-        self.button_up_calb.setText("キャリブレーション:上")
-        self.button_up_calb.clicked.connect(self.calibration_up)
-        self.up_calb_flag = False
-        self.upper_limit = window_size_y
-
-        #キャリブレーション:下
-        self.button_down_calb = QPushButton(self)
-        self.button_down_calb.move(200, 150)
-        self.button_down_calb.setText("キャリブレーション:下")
-        self.button_down_calb.clicked.connect(self.calibration_down)
-        self.down_calb_flag = False
-        self.lower_limit = 0
-
-
-        #リセット
-        self.button_reset = QPushButton(self)
-        self.button_reset.move(400, 50)
-        self.button_reset.setText("リセット")
-        self.button_reset.clicked.connect(self.calibration_reset)
-
-        #座標値(x,y)と衝突円の番号(t)の出力
-        self.textlabel_x = QLabel(self)
-        self.textlabel_x.setText("X：")
-        self.textlabel_x.move(10, 0)
-        self.textbox_x = QLineEdit(self)
-        self.textbox_x.move(10, 20)
-        self.textbox_x.resize(40, 20)
-
-        self.textlabel_y = QLabel(self)
-        self.textlabel_y.setText("Y：")
-        self.textlabel_y.move(60, 0)
-        self.textbox_y = QLineEdit(self)
-        self.textbox_y.move(60, 20)
-        self.textbox_y.resize(40, 20)
-
-
-        self.cursor_hider = QCursor(QPixmap("bitmap.png"))
         self.mousemode = False
+
+    def my_on_press(key):
+        print('hi tohu!')
+
+    def my_on_release(key):
+        print('hi tohu!')
 
     def keyPressEvent(self, keyevent):
         if keyevent.key() == Qt.Key_Shift:
@@ -174,15 +108,6 @@ class main_window(QWidget):
             if self.mousemode:
                 pyautogui.click(self.x, self.y, 1, 1, 'left')
     
-    def paintEvent(self, QPaintEvent):
-        painter = QPainter(self)
-        self.textbox_x.setText(str(int(self.x)))  # 座標確認用
-        self.textbox_y.setText(str(int(self.y)))  # 座標確認用
-        painter.setPen(Qt.black)
-        #painter.setBrush(Qt.red)
-        #painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
-        painter.setBrush(Qt.red)
-        painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
     #膝位置計算
 
     def my_map(self, val, in_min, in_max, out_min, out_max):
@@ -250,89 +175,9 @@ class main_window(QWidget):
                 self.old_y = self.new_y
 
         return self.new_x, self.new_y
-    #左方向キャリブレーション
-    def calibration_left(self):
-        x = 0
-        y = 0
-        if not self.left_calb_flag:
-            for i in range(100):
-                tmp = rd.read_test_ser()
-                val = [64-float(v) for v in tmp]
-                x, y = self.pointer_calc(val)
-            self.left_limit = x
-            print("left")
-            print(x)
-            self.left_calb_flag = True
-            self.ema_reset()
-
-    #右方向キャリブレーション
-    def calibration_right(self):
-        x = 0
-        y = 0
-        if not self.right_calb_flag:
-            for i in range(100):
-                tmp = rd.read_test_ser()
-                val = [64-float(v) for v in tmp]
-                x, y = self.pointer_calc(val)
-            self.right_limit = x
-            print("right")
-            print(x)
-            self.right_calb_flag = True
-            self.ema_reset()
-    #真中キャリブレーション
-    def calibration_center(self):
-        x = 0
-        y = 0
-        if not self.center_calb_flag:
-            for i in range(100):
-                tmp = rd.read_test_ser()
-                val = [64-float(v) for v in tmp]
-                x, y = self.pointer_calc(val)
-            self.center_posx = x
-            self.center_posy = y
-            print("center")
-            print(x,y)
-            self.center_calb_flag = True
-            self.ema_reset()
-
-    #上方向キャリブレーション
-    def calibration_up(self):
-        x = 0
-        y = 0
-        if not self.up_calb_flag:
-            for i in range(100):
-                tmp = rd.read_test_ser()
-                val = [64-float(v) for v in tmp]
-                x, y = self.pointer_calc(val)
-            self.upper_limit = y
-            print("upper")
-            print(y)
-            self.up_calb_flag = True
-            self.ema_reset()
-
-    #下方向キャリブレーション
-    def calibration_down(self):
-        x = 0
-        y = 0
-        if not self.down_calb_flag:
-            for i in range(100):
-                tmp = rd.read_test_ser()
-                val = [64-float(v) for v in tmp]
-                x, y = self.pointer_calc(val)
-            self.lower_limit = y
-            print("lower")
-            print(y)
-            self.down_calb_flag = True
-            self.ema_reset()
 
     def calibration_check(self):
-        return self.left_calb_flag and self.right_calb_flag and self.up_calb_flag and self.down_calb_flag
-
-    def calibration_reset(self):
-        self.left_calb_flag = True
-        self.right_calb_flag = True
-        self.up_calb_flag = True
-        self.down_calb_flag = True
+        return True
 
 
     def value_upd(self):
@@ -387,18 +232,14 @@ class main_window(QWidget):
                 elif self.y > window_size_y:
                     self.y = window_size_y
                 
-                if self.mousemode:
-                    pyautogui.moveTo(self.x, self.y)
-                self.update()
+                pyautogui.moveTo(self.x, self.y)
     def main(self):
-        self.show()
-        app.exec_()
+        while True:
+            self.value_upd()
 
 
 rd = sensor_read()
-app = QApplication(sys.argv)
-window = main_window()
-
+window = move_mouse()
 
 if __name__ == '__main__':
     window.main()

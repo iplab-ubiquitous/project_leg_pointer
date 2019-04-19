@@ -13,22 +13,23 @@ import numpy as np
 import random
 import time
 
-window_size_x = 1920         
+window_size_x = 1920
 window_size_y = 1080
-#window_size_x, window_size_y = pyautogui.size()
+window_size_x, window_size_y = pyautogui.size()
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
 wait_flame = 100
 alpha = 0.1
 beta = 0.65
-pointer_size = 8
-#ppi = 128 #macbookpro 13.3 2018 1440*900
-#ppi = 102.42 #研究室のDELLのディスプレイ
+pointer_size = 20
+ppi = 102.42  # 研究室のDELLのディスプレイ
 #ppi = 94.0   #家のディスプレイ(EV2455)
-ppi = 91.788 #S2409Wb(24inch 1920*1080)
+pyautogui.FAILSAFE = True
+pyautogui.PAUSE = 0.001
 
-output_path_log = 'exp_data/leg/log_p3_l3_leg.csv'
-output_path_data = 'exp_data/leg/data_p3_l3_leg.csv'
+output_path_log = 'exp_data/leg/log_p1_leg.csv'
+output_path_data = 'exp_data/leg/data_p1_leg.csv'
+
 
 class sensor_read:
     def __init__(self):
@@ -63,33 +64,6 @@ class main_window(QWidget):
         self.new_y = 0
         self.old_y = window_size_y / 2
 
-    #ターゲット円配置
-    def set_target(self):
-        #選択すべきターゲット順を定義
-        #マルチポインティングタスクに倣った順
-        self.target_order = [0]
-        n = 0
-        for i in range(self.num_of_targets):
-            n += int(self.num_of_targets/2)
-            self.target_order.append(n % self.num_of_targets)
-        #print(self.target_order) 
-        self.order_num = 0
-
-        #単純なランダム順
-        #self.target_order = list(range(self.num_of_targets))
-        #random.shuffle(self.target_order)
-        
-        #配置する座標の計算
-        self.target_point = []
-        for i in range(self.num_of_targets):
-            cx = window_size_x / 2 + self.radius * math.cos(2 * math.pi * (float(i) / self.num_of_targets) - (math.pi/2))
-            cy = window_size_y / 2 + self.radius * math.sin(2 * math.pi * (float(i) / self.num_of_targets) - (math.pi/2))
-            self.target_point.append(QPoint(cx, cy))
-
-    def cmetre_to_pixel(self, val):
-        return val * (ppi*0.39370)
-    def pixel_to_cmetre(self, val):
-        return val / (ppi*0.39370)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -98,7 +72,7 @@ class main_window(QWidget):
         self.weight = ([1.00] * num_of_sensor)
         self.val = np.zeros((wait_flame, num_of_sensor), dtype=np.float)
         self.leg_flag = False
-        self.sensor_flt = np.zeros((wait_flame,num_of_sensor),dtype=np.float)
+        self.sensor_flt = np.zeros((wait_flame, num_of_sensor), dtype=np.float)
 
         #指数平均平滑フィルタ(EMA)用
         self.old_ema = np.zeros(num_of_sensor, dtype=np.float)
@@ -108,13 +82,6 @@ class main_window(QWidget):
         self.new_y = 0
         self.old_y = window_size_y / 2
 
-        #低速モード用フラグ
-        self.slower_mode = False
-
-        #実験条件
-        self.num_of_targets = 13  # ターゲット数
-        self.radius = self.cmetre_to_pixel(1.0)  # 全体の円の直径
-        self.target_radius = self.cmetre_to_pixel(0.5)  # ターゲット円の直径
 
         #ウィンドウサイズ
         self.resize(window_size_x, window_size_y)
@@ -122,39 +89,14 @@ class main_window(QWidget):
         #ポインタ座標値
         self.x = 0
         self.y = 0
-        self.xs= 0
-        self.ys = 0
 
 
-        #実験データ収集
-        self.exp_timer_init()
-        self.exp_start_flag = False
-        self.exp_end_flag = False
-        self.task_num = 0
-        self.session_num = 0
-        self.miss = 0
-        self.miss_flag = False
-        self.clicked = 0
-        self.amplitude = 0
-        self.logger = np.empty((0, 6), float)
-        self.data = np.empty((0, 7), float)
 
-        #衝突判定とターゲット位置計算
-        self.collision_flag = False
-        #self.collision_num = 0
-        self.set_target()
-
-        #実験条件[D,W]
-        self.condition = [[3.0, 2.5], [3.0, 1.5], [3.0, 0.5], [12.0, 2.5], [12.0, 1.5], [12.0, 0.5], [24.0, 2.5], [24.0, 1.5], [24.0, 0.5]]
-        random.shuffle(self.condition)
-
-        
         #nカウントごとにタイムアウト、タイムアウト時に任意の関数を呼び出す
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.value_upd)
-        self.timer.start(5)  #200fps以下
+        self.timer.start(5)  # 200fps以下
 
-        
         #キャリブレーション:左
         self.button_left_calb = QPushButton(self)
         self.button_left_calb.move(0, 50)
@@ -170,7 +112,7 @@ class main_window(QWidget):
         self.button_right_calb.clicked.connect(self.calibration_right)
         self.right_calb_flag = False
         self.right_limit = 0
-        
+
         #キャリブレーション:真中
         self.button_center_calb = QPushButton(self)
         self.button_center_calb.move(100, 100)
@@ -196,12 +138,12 @@ class main_window(QWidget):
         self.down_calb_flag = False
         self.lower_limit = 0
 
+
         #リセット
         self.button_reset = QPushButton(self)
         self.button_reset.move(400, 50)
         self.button_reset.setText("リセット")
         self.button_reset.clicked.connect(self.calibration_reset)
-
 
         #座標値(x,y)と衝突円の番号(t)の出力
         self.textlabel_x = QLabel(self)
@@ -218,182 +160,30 @@ class main_window(QWidget):
         self.textbox_y.move(60, 20)
         self.textbox_y.resize(40, 20)
 
-        #self.textbox_t = QLineEdit(self)
-        #self.textbox_t.move(window_size_x/2, window_size_y/2)
-        #self.textbox_t.resize(70, 20)
-
-        #実験条件の変更
-        #ターゲット数 = num_of_target の変更(初期値:13)
-        self.num_of_targets_label = QLabel(self)
-        self.num_of_targets_label.setText("ターゲット数")
-        self.num_of_targets_label.move(200, 0)
-        self.set_num_of_target = QLineEdit(self)
-        self.set_num_of_target.move(200, 20)
-        self.set_num_of_target.setText(str(self.num_of_targets))
-        self.set_num_of_target.resize(100, 20)
-
-        #全体の円の半径 = radius の変更(初期値:300)
-        self.radius_label = QLabel(self)
-        self.radius_label.setText("タスク番号")
-        self.radius_label.move(350, 0)
-        self.set_radius = QLineEdit(self)
-        self.set_radius.move(350, 20)
-        self.set_radius.setText(str(self.pixel_to_cmetre(self.radius)))
-        self.set_radius.resize(100, 20)
-
-        '''
-        #ターゲット数 = target_radius の変更(初期値:40)
-        self.target_radius_label = QLabel(self)
-        self.target_radius_label.setText("W = ")
-        self.target_radius_label.move(500, 0)
-        self.set_target_radius = QLineEdit(self)
-        self.set_target_radius.move(500, 20)
-        self.set_target_radius.setText(
-            str(self.pixel_to_cmetre(self.target_radius)))
-        self.set_target_radius.resize(100, 20)
-        '''
-
-        #実験条件の変更の反映
-        self.button_exec = QPushButton(self)
-        self.button_exec.move(700, 20)
-        self.button_exec.setText("Next")
-        self.button_exec.clicked.connect(self.set_target_config)
 
         self.cursor_hider = QCursor(QPixmap("bitmap.png"))
+        self.mousemode = False
 
-    #実験データ収集用
-    #操作時間計測
-    def data_log(self):
-        if self.exp_start_flag:
-            dist = self.calc_amplitude(
-                self.target_point[self.target_order[self.order_num]].x(), self.x, self.target_point[self.target_order[self.order_num]].y(), self.y)
-            tm = time.time()-self.start
-            self.logger = np.append(self.logger, np.array(
-                [[self.task_num,  self.x, self.y, self.clicked, self.miss, tm]]), axis=0)
-            self.miss_flag = False
-    def exp_timer_init(self):
-        self.start = 0
-        self.tstamp = 0
-        self.exp_start_flag = False
-    def exp_timer_clicked(self):
-        if self.order_num > 0:
-            tm = time.time()-self.tstamp
-            _id = math.log2(1+self.condition[self.task_num][0]/self.condition[self.task_num][1])
-            ofs = self.calc_amplitude(self.x, self.target_point[self.target_order[self.order_num]].x(), self.y, self.target_point[self.target_order[self.order_num]].y())
-            self.data = np.append(self.data, np.array([[self.session_num, self.task_num, self.order_num, tm, _id, self.miss_flag, ofs]]), axis=0)
-            
-        self.tstamp = time.time()
-    def exp_timer_stop(self):
-        self.exp_start_flag = False
-        self.exp_end_flag = True
-        QApplication.setOverrideCursor(Qt.ArrowCursor)
-
-        tm = time.time()-self.start
-        self.logger = np.append(self.logger, np.array(
-            [[self.task_num, self.x, self.y, self.clicked, self.miss, tm]]), axis=0)
-        print('selection miss: ' + str(self.miss) + ' time(s)')
-        np.savetxt(output_path_log, self.logger, delimiter=',', fmt=[
-                   '%.0f', '%.0f', '%.0f', '%.0f', '%.0f', '%.3f'], header='exp_num, x, y, keypress, missed, time', comments='')
-        np.savetxt(output_path_data, self.data, delimiter=',', fmt=[
-                '%.0f', '%.0f', '%.0f', '%.3f', '%.3f', '%.0f', '%.3f'], header='session_num, task_num, try_num, time, ID, miss, offset', comments='')
-        self.exp_timer_init()
-
-    def calc_amplitude(self, x1, x2, y1, y2):
-        return math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
-
-
-    def set_target_config(self):
-        if self.exp_end_flag:
-            self.task_num += 1
-            self.exp_end_flag = False
-            if self.task_num == 9:
-                self.session_num += 1
-                if self.session_num < 5:
-                    random.shuffle(self.condition)  
-                    self.task_num = 0
-                else:
-                    exit(1)
-        print(str(self.session_num) + "-" + str(self.task_num))
-        self.num_of_targets = int(self.set_num_of_target.text())
-        self.radius = self.cmetre_to_pixel(self.condition[self.task_num][0]/2)
-        self.target_radius = self.cmetre_to_pixel(self.condition[self.task_num][1]/2)
-        self.set_target()
-        self.exp_timer_init()
-        
-        self.clicked = 0
-        self.miss = 0
-        self.miss_flag = False
- 
-        self.update()
-
-
+    def keyPressEvent(self, keyevent):
+        if keyevent.key() == Qt.Key_Shift:
+            if self.mousemode:
+                self.mousemode = False
+            else:
+                self.mousemode = True
+    
     def paintEvent(self, QPaintEvent):
         painter = QPainter(self)
         self.textbox_x.setText(str(int(self.x)))  # 座標確認用
         self.textbox_y.setText(str(int(self.y)))  # 座標確認用
-        self.set_radius.setText(str(self.task_num))
         painter.setPen(Qt.black)
         #painter.setBrush(Qt.red)
         #painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
-        
-        if self.exp_start_flag:
-            painter.setBrush(QColor(0xee, 0xee, 0xee)) #背景と同じ色
-            for i in range(self.num_of_targets):
-                painter.drawEllipse(
-                    self.target_point[i], self.target_radius, self.target_radius)
-            painter.setBrush(QColor(0x48, 0xcb, 0xeb)) #青
-            painter.drawEllipse(
-                self.target_point[self.target_order[self.order_num]], self.target_radius, self.target_radius)
-        else:
-            painter.setBrush(QColor(0xff, 0xaa, 0x00)) #オレンジ
-            for i in range(self.num_of_targets):
-                painter.drawEllipse(
-                    self.target_point[i], self.target_radius, self.target_radius)
-        #if self.collision_flag:
-            #painter.setBrush(Qt.white)
-            #painter.drawEllipse(
-                #self.target_point[self.collision_nums], self.target_radius, self.target_radius)
-        #self.textbox_t.setText(str(self.collision_flag))
         painter.setBrush(Qt.red)
-        painter.drawEllipse(QPoint(self.x, self.y), pointer_size, pointer_size)
+        painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
+    #膝位置計算
 
-
-    def keyPressEvent(self, keyevent):
-        #print(keyevent.key())
-        if keyevent.key() == Qt.Key_Return:  
-            self.clicked += 1
-
-            if not self.collision_flag and not self.order_num == 0:
-                self.miss_flag = True
-                self.miss += 1
-            self.exp_timer_clicked()
-            if self.order_num == self.num_of_targets:
-                self.exp_timer_stop()
-                
-
-            self.miss_flag = False
-            self.order_num += 1
-            self.order_num = self.order_num % (self.num_of_targets+1)
-        if keyevent.key() == Qt.Key_Control:
-            if not self.exp_end_flag:
-                QApplication.setOverrideCursor(self.cursor_hider)
-                self.start = time.time()
-                self.tstamp = time.time()
-                self.exp_start_flag = True
-                print("start")
-
-        if keyevent.key() == Qt.Key_Shift:
-            self.set_target_config()
-
-    def keyReleaseEvent(self, keyevent):
-        if keyevent.key() == Qt.Key_Shift:
-            self.slower_mode = False
-            self.x = self.xs
-            self.y = self.ys
-    
     def my_map(self, val, in_min, in_max, out_min, out_max):
         return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
-
     def pointer_calc(self, sensor_val):
         #print(left_limit, right_limit, upper_limit, lower_limit)
 
@@ -430,8 +220,6 @@ class main_window(QWidget):
             #y座標計算
             top_sensor = np.argsort(-sensor_val)
             self.new_y = max(sensor_val)
-            #self.new_y = (window_size_y) * (59.0 - sensor_val[int(np.median(near_snum))]) / 59.0-52.0
-            #self.new_y = (window_size_y) * (59.0 - np.average([sensor_val[v] for v in near_snum])) / 59.0-52.0
 
             #x座標計算
             for i in range(num_of_sensor):
@@ -460,7 +248,6 @@ class main_window(QWidget):
 
         return self.new_x, self.new_y
     #左方向キャリブレーション
-
     def calibration_left(self):
         x = 0
         y = 0
@@ -488,7 +275,6 @@ class main_window(QWidget):
             self.right_calb_flag = True
             self.ema_reset()
     #真中キャリブレーション
-
     def calibration_center(self):
         x = 0
         y = 0
@@ -532,14 +318,13 @@ class main_window(QWidget):
             self.ema_reset()
 
     def calibration_check(self):
-        return self.left_calb_flag and self.right_calb_flag and self.up_calb_flag and self.down_calb_flag and self.center_calb_flag
+        return self.left_calb_flag and self.right_calb_flag and self.up_calb_flag and self.down_calb_flag
 
     def calibration_reset(self):
-        self.left_calb_flag = False
-        self.right_calb_flag = False
-        self.up_calb_flag = False
-        self.down_calb_flag = False
-        self.center_calb_flag = False
+        self.left_calb_flag = True
+        self.right_calb_flag = True
+        self.up_calb_flag = True
+        self.down_calb_flag = True
 
 
     def value_upd(self):
@@ -593,16 +378,14 @@ class main_window(QWidget):
                     self.y = 0
                 elif self.y > window_size_y:
                     self.y = window_size_y
-                #pyautogui.moveTo(self.x, self.y)
-        #衝突判定
-                self.collision_flag = ((self.x - self.target_point[self.target_order[self.order_num]].x()) * (self.x - self.target_point[self.target_order[self.order_num]].x())) + (
-                    (self.y - self.target_point[self.target_order[self.order_num]].y()) * (self.y - self.target_point[self.target_order[self.order_num]].y())) <= (self.target_radius + pointer_size) * (self.target_radius + pointer_size)
+                
+                if self.mousemode:
+                    pyautogui.moveTo(self.x, self.y)
                 self.update()
-                self.data_log()
-
     def main(self):
         self.show()
         app.exec_()
+
 
 rd = sensor_read()
 app = QApplication(sys.argv)

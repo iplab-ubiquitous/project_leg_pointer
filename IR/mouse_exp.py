@@ -11,12 +11,14 @@ import numpy as np
 import random
 import time
 
-window_size_x = 1440        
-window_size_y = 900
+window_size_x = 1920      
+window_size_y = 1080
 #window_size = QtGui.qApp.desktop().width()
-pointer_size = 20
-ppi = 102.42 #研究室のDELLのディスプレイ
+pointer_size = 10
+#ppi = 128 #macbookpro 13.3 2018 1440*900
+#ppi = 102.42 #研究室のDELLのディスプレイ
 #ppi = 94.0   #家のディスプレイ(EV2455)
+ppi = 91.788 #S2409Wb(24inch 1920*1080)
 
 output_path_log = 'exp_data/mouse/log_p0_mouse.csv'
 output_path_data = 'exp_data/mouse/data_p0_mouse.csv'
@@ -59,18 +61,18 @@ class main_window(QWidget):
                                         self.num_of_targets) - (math.pi/2))
             self.target_point.append(QPoint(cx, cy))
     
-    def inch_to_pixel(self, val):
-        return val * ppi
-    def pixel_to_inch(self, val):
-        return val / ppi
+    def cmetre_to_pixel(self, val):
+        return val * (ppi*0.39370)
+    def pixel_to_cmetre(self, val):
+        return val / (ppi*0.39370)
 
     def __init__(self, parent=None):
         super().__init__(parent)
 
         #実験条件
         self.num_of_targets = 13  # ターゲット数
-        self.radius = self.inch_to_pixel(1.0)  # 全体の円の直径
-        self.target_radius = self.inch_to_pixel(0.5)  # ターゲット円の直径
+        self.radius = self.cmetre_to_pixel(1.0)  # 全体の円の直径
+        self.target_radius = self.cmetre_to_pixel(0.5)  # ターゲット円の直径
 
         #ウィンドウサイズ
         self.resize(window_size_x, window_size_y)
@@ -133,7 +135,7 @@ class main_window(QWidget):
         self.radius_label.move(350, 0)
         self.set_radius = QLineEdit(self)
         self.set_radius.move(350, 20)
-        self.set_radius.setText(str(self.pixel_to_inch(self.radius)))
+        self.set_radius.setText(str(self.pixel_to_cmetre(self.radius)))
         self.set_radius.resize(100, 20)
 
         self.target_radius_label = QLabel(self)
@@ -141,7 +143,7 @@ class main_window(QWidget):
         self.target_radius_label.move(500, 0)
         self.set_target_radius = QLineEdit(self)
         self.set_target_radius.move(500, 20)
-        self.set_target_radius.setText(str(self.pixel_to_inch(self.target_radius)))
+        self.set_target_radius.setText(str(self.pixel_to_cmetre(self.target_radius)))
 
         self.set_target_radius.resize(100, 20)
 
@@ -168,8 +170,8 @@ class main_window(QWidget):
     def exp_timer_clicked(self):
         if self.order_num > 0:
             tm = time.time()-self.tstamp
-            self.data = np.append(self.data, np.array([[self.exp_num, self.order_num, tm, self.pixel_to_inch(self.radius*2), math.log2(
-                1+self.pixel_to_inch(self.radius*2)/self.pixel_to_inch(self.target_radius*2)), self.miss_flag]]), axis=0)
+            self.data = np.append(self.data, np.array([[self.exp_num, self.order_num, tm, self.pixel_to_cmetre(self.radius*2), math.log2(
+                1+self.pixel_to_cmetre(self.radius*2)/self.pixel_to_cmetre(self.target_radius*2)), self.miss_flag]]), axis=0)
             
         self.tstamp = time.time()
     def exp_timer_stop(self):
@@ -193,8 +195,8 @@ class main_window(QWidget):
 
     def set_target_config(self):
         self.num_of_targets = int(self.set_num_of_target.text())
-        self.radius = self.inch_to_pixel(float(self.set_radius.text())/2)
-        self.target_radius = self.inch_to_pixel(float(self.set_target_radius.text())/2)
+        self.radius = self.cmetre_to_pixel(float(self.set_radius.text())/2)
+        self.target_radius = self.cmetre_to_pixel(float(self.set_target_radius.text())/2)
         self.set_target()
         self.exp_timer_init()
         
@@ -234,7 +236,9 @@ class main_window(QWidget):
                 #self.target_point[self.collision_nums], self.target_radius, self.target_radius)
         #self.textbox_t.setText(str(self.collision_flag))
         painter.setBrush(Qt.red)
-        painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
+        painter.drawEllipse(QPoint(self.x, self.y), pointer_size, pointer_size)
+        #painter.setBrush(QColor(0xee, 0xee, 0xee))
+        #painter.drawEllipse(QPoint(960,540), self.radius, self.radius)
 
 
     def keyPressEvent(self, keyevent):

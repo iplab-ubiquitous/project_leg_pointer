@@ -2,17 +2,17 @@
 import sys, math
 from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton,
                              QGridLayout, QSizePolicy, QLineEdit,
-                             QLineEdit, QDialog, QLabel)
-from PyQt5.QtGui import QPainter, QFont, QColor
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QPoint
+                             QLineEdit, QDialog, QLabel, QHBoxLayout)
+from PyQt5.QtGui import QPainter, QFont, QColor, QPixmap
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QPoint, QSize
 #PySerial
 import pyautogui
 import numpy as np
 import random
 import time
 
-window_size_x = 1920
-window_size_y = 1080
+window_size_x = 1440
+window_size_y = 900
 #window_size = QtGui.qApp.desktop().width()
 pointer_size = 20
 
@@ -131,6 +131,17 @@ class main_window(QWidget):
         self.button_exec.setText("設定")
         self.button_exec.clicked.connect(self.set_target_config)
 
+
+        self.size = QSize(1000,200)
+        self.height = 200
+        self.pixmap = QPixmap("image.png")
+        self.pixmap = self.pixmap.scaled(self.size, Qt.KeepAspectRatio, Qt.FastTransformation)
+        self.lbl = QLabel(self)
+        self.lbl.move(720,450)
+        self.lbl.setPixmap(self.pixmap)
+
+
+
         #self.pos[num_of_sensor-1] = window_size_x + abs(self.pos[0])
     def exp_timer_init(self):
         self.start = 0
@@ -191,6 +202,12 @@ class main_window(QWidget):
             painter.setBrush(Qt.white)
             painter.drawEllipse(self.target_point[self.collision_num], self.target_radius, self.target_radius)
             self.textbox_t.setText(str(self.collision_num))
+
+        if self.x > 1200:
+            self.height+=1
+            smaller_pixmap = self.pixmap.scaled(QSize(1000,self.height), Qt.KeepAspectRatio, Qt.FastTransformation)
+            self.lbl.setPixmap(smaller_pixmap)
+        
 
     def keyPressEvent(self, keyevent):
         #print(keyevent.key())

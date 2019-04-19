@@ -77,50 +77,51 @@ def model_prediction(data, num):
         pred_time = a+b*id_series
         print(true_time)
         print(pred_time)
-        print("r2 = " + str(r2_score(true_time, pred_time)))
+        r_2 = np.round(r2_score(true_time, pred_time), decimals=3)
+        print("r2 = " + str(r_2))
         print("")
 
-        return fitted
+        return fitted, r_2
 
 
 xp = np.linspace(0, 5, 5)
-fitted_left = model_prediction(import_file, 13*3*3)
-fitted_P1 = model_prediction(file_P1, 13*3)
+fitted_left, r_2 = model_prediction(import_file, 13*3*3)
+fitted_P1, r_2 = model_prediction(file_P1, 13*3)
 P1_label = "predict time (P1): " + \
     str(round(fitted_P1[1], 3)) + "+" + \
-    str(round(fitted_P1[0], 3)) + "*" + "ID"
-fitted_P2 = model_prediction(file_P2, 13*3)
+    str(round(fitted_P1[0], 3)) + "*" + "ID (r2=" + str(r_2) + ")"
+fitted_P2, r_2 = model_prediction(file_P2, 13*3)
 P2_label = "predict time (P2): " + \
     str(round(fitted_P2[1], 3)) + "+" + \
-    str(round(fitted_P2[0], 3)) + "*" + "ID"
-fitted_P3 = model_prediction(file_P3, 13*3)
+    str(round(fitted_P2[0], 3)) + "*" + "ID (r2=" + str(r_2) + ")"
+fitted_P3, r_2 = model_prediction(file_P3, 13*3)
 P3_label = "predict time (P3): " + \
     str(round(fitted_P3[1], 3)) + "+" + \
-    str(round(fitted_P3[0], 3)) + "*" + "ID"
+    str(round(fitted_P3[0], 3)) + "*" + "ID (r2=" + str(r_2) + ")"
 p_left = np.poly1d(fitted_left)(xp)
 p1 = np.poly1d(fitted_P1)(xp)
 p2 = np.poly1d(fitted_P2)(xp)
 p3 = np.poly1d(fitted_P3)(xp)
 
 
-plt.figure(figsize=(8,4))
-plt.title("Right Leg")
-plt.xlabel("ID = log(D/W + 1) [bit/s]")
-plt.ylabel("Moving Time [s]")
+plt.figure(figsize=(7,5))
+plt.title("Right Leg",fontsize=14)
+plt.xlabel("ID = log(D/W + 1) [bit]", fontsize=16)
+plt.ylabel("Moving Time [s]", fontsize=16)
 
 
 plt.scatter(imp1_x, imp1_y, s=30, marker="o",
-            label='selection time (P1)', c="black")
+            label='selection time (P1)', c="#e67e22", alpha=0.7)
 plt.scatter(imp2_x, imp2_y, s=30, marker="x",
-            label='selection time (P2)', c="black")
-plt.scatter(imp3_x, imp3_y, s=30, marker="^",
-            label='selection time (P3)', c="black")
+            label='selection time (P2)', c="#27ae60", alpha=0.7)
+plt.scatter(imp3_x, imp3_y, s=30, marker="+",
+            label='selection time (P3)', c="#2980b9", alpha=0.7)
 
-plt.plot(xp, p1, label=P1_label, linestyle="solid", c="black")
-plt.plot(xp, p2, label=P2_label, linestyle="dashed", c="black")
-plt.plot(xp, p3, label=P3_label, linestyle="dashdot", c="black")
+plt.plot(xp, p1, label=P1_label, linestyle="solid", c="#e67e22")
+plt.plot(xp, p2, label=P2_label, linestyle="dashed", c="#27ae60")
+plt.plot(xp, p3, label=P3_label, linestyle="dashdot", c="#2980b9")
 plt.legend(bbox_to_anchor=(0, 1), loc='upper left',
-           borderaxespad=1, fontsize=10)
+           borderaxespad=1, fontsize=12)
 #plt.plot(xp, p_left, label="predict time (Left)", c='black')
 
 #plt.xlim(0, 1920)

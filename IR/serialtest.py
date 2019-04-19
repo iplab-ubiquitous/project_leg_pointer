@@ -12,8 +12,8 @@ import numpy as np
 import random
 import time
 
-window_size_x = 1920    
-window_size_y = 1080
+window_size_x = 1440   
+window_size_y = 900
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
 wait_flame = 100
@@ -24,7 +24,7 @@ output_path = 'data_p0_leg.csv'
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem143201', 460800)
+        self.ser = serial.Serial('/dev/cu.usbmodem141201', 460800)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -92,6 +92,7 @@ class main_window(QWidget):
             self.val[i].setText(str(round(self.n_sensor_val[i], 2)))
 
 
+    
     def value_upd(self):
         
         #print(self.left_limit, self.right_limit,self.upper_limit, self.lower_limit)

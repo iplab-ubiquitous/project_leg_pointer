@@ -18,7 +18,9 @@ import_file = np.loadtxt(path, delimiter=',', skiprows=1)
 import_file = import_file[np.argsort(import_file[:, 4])]
 
 delta_t = import_file[:, 2]
+print(delta_t.shape[0])
 d_id = import_file[:, 4]
+print(d_id.shape[0])
 err = sum(import_file[:, 5]) / len(import_file[:,5])
 '''
 we = np.array([0.5, 1.0, 1.5])
@@ -36,14 +38,14 @@ for i in range(dis.shape[0]):
 d_id_e = np.sort(d_id_e)
 print("ID(e) = " + str(d_id_e))
 
-
-
-d_id_e_pred = np.empty(0)
-for i in range(d_id_e.shape[0]):
-    for j in range(13*3*3):
-        d_id_e_pred = np.append(d_id_e_pred, d_id_e[i])
-
 '''
+
+d_id_pred = np.empty(0)
+for i in range(d_id.shape[0]):
+    for j in range(13*3*3):
+        d_id_pred = np.append(d_id_pred, d_id[i])
+
+
 
 
 
@@ -51,10 +53,9 @@ for i in range(d_id_e.shape[0]):
 true_time = np.empty(0)
 id_series = np.empty(0)
 for i in d_id:
+    #IDごとに操作時間を平均
     d = import_file[import_file[:,4] == i][:,2]
     true_time = np.append(true_time, statistics.mean(d))
-    d = import_file[import_file[:, 4] == i][:, 4]
-    id_series = np.append(id_series, statistics.mean(d))
 true_time = np.unique(true_time)
 id_series = np.unique(id_series)
 print(id_series)
@@ -66,12 +67,16 @@ print("MT = " + str(a) + " + " + str(b) + " log(D/W + 1) ")
 tp = d_id / (a+b*d_id)
 print("TP = " + str(statistics.mean(tp)))
 print("Err = " + str(err))
+d_id = np.unique(d_id)
+print(d_id)
 pred_time = a+b*d_id
+#pred_time = list(set(pred_time))
 print(true_time)
 print(pred_time)
 print("r2 = " + str(r2_score(true_time, pred_time)))
 
 
+'''
 xp = np.linspace(0, 5, 5)
 p = np.poly1d(fitted)(xp)
 
@@ -89,5 +94,6 @@ plt.ylim(0,9)
 plt.xlim(1.0,4.5)
 plt.show()
 plt.savefig('image.png')
+'''
 
 
