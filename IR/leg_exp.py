@@ -13,26 +13,26 @@ import numpy as np
 import random
 import time
 
-window_size_x = 1920         
+window_size_x = 1920        
 window_size_y = 1080
 #window_size_x, window_size_y = pyautogui.size()
-#window_size = QtGui.qApp.desktop().width()
+
 num_of_sensor = 10
 wait_flame = 100
 alpha = 0.1
 beta = 0.65
 pointer_size = 8
-#ppi = 128 #macbookpro 13.3 2018 1440*900
-#ppi = 102.42 #研究室のDELLのディスプレイ
-#ppi = 94.0   #家のディスプレイ(EV2455)
-ppi = 91.788 #S2409Wb(24inch 1920*1080)
+ppi = 128       #macbookpro 13.3 2018 1440*900
+#ppi = 102.42   #研究室のDELLのディスプレイ
+#ppi = 94.0     #家のディスプレイ(EV2455)
+#ppi = 91.788   #S2409Wb(24inch 1920*1080)
 
 output_path_log = 'exp_data/leg/log_p3_l3_leg.csv'
 output_path_data = 'exp_data/leg/data_p3_l3_leg.csv'
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem143201', 460800)
+        self.ser = serial.Serial('/dev/cu.usbmodem141301', 460800)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -41,8 +41,6 @@ class sensor_read:
         while self.ser.in_waiting > 1 or lst == float(0):
             lst = self.ser.readline().strip().decode("utf-8").split(',')
 
-        #line_f = [float(s) for s in self.line]
-        #return line_f
 
         return lst
 
@@ -54,7 +52,7 @@ class main_window(QWidget):
         self.sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         self.weight = ([1.00] * num_of_sensor)
 
-    #指数平均平滑フィルタ変数のリセット(本当は必要ないかもしれない)
+    #キャリブレーションとそれ以外でEMAフィルタを分けるためリセット
     def ema_reset(self):
         self.old_ema = np.zeros(num_of_sensor, dtype=np.float)
         self.new_ema = np.zeros(num_of_sensor, dtype=np.float)
@@ -72,18 +70,13 @@ class main_window(QWidget):
         for i in range(self.num_of_targets):
             n += int(self.num_of_targets/2)
             self.target_order.append(n % self.num_of_targets)
-        #print(self.target_order) 
         self.order_num = 0
-
-        #単純なランダム順
-        #self.target_order = list(range(self.num_of_targets))
-        #random.shuffle(self.target_order)
         
-        #配置する座標の計算
+        #配置する座標の計算、MacKenzieらのものを参考
         self.target_point = []
         for i in range(self.num_of_targets):
-            cx = window_size_x / 2 + self.radius * math.cos(2 * math.pi * (float(i) / self.num_of_targets) - (math.pi/2))
-            cy = window_size_y / 2 + self.radius * math.sin(2 * math.pi * (float(i) / self.num_of_targets) - (math.pi/2))
+            cx = window_size_x / 2 + self.t_distance * math.cos(2 * math.pi * (float(i) / self.num_of_targets) - (math.pi/2))
+            cy = window_size_y / 2 + self.t_distance * math.sin(2 * math.pi * (float(i) / self.num_of_targets) - (math.pi/2))
             self.target_point.append(QPoint(cx, cy))
 
     def cmetre_to_pixel(self, val):
@@ -112,9 +105,9 @@ class main_window(QWidget):
         self.slower_mode = False
 
         #実験条件
-        self.num_of_targets = 13  # ターゲット数
-        self.radius = self.cmetre_to_pixel(1.0)  # 全体の円の直径
-        self.target_radius = self.cmetre_to_pixel(0.5)  # ターゲット円の直径
+        self.num_of_targets = 13  
+        self.t_distance = self.cmetre_to_pixel(1.0)  # 全体の円の直径
+        self.t_width = self.cmetre_to_pixel(0.5)  # ターゲット円の直径
 
         #ウィンドウサイズ
         self.resize(window_size_x, window_size_y)
@@ -144,7 +137,7 @@ class main_window(QWidget):
         #self.collision_num = 0
         self.set_target()
 
-        #実験条件[D,W]
+        #実験条件[D,W] ランダムシャッフルで順番を決定しセッションごとに自動で呼び出し
         self.condition = [[3.0, 2.5], [3.0, 1.5], [3.0, 0.5], [12.0, 2.5], [12.0, 1.5], [12.0, 0.5], [24.0, 2.5], [24.0, 1.5], [24.0, 0.5]]
         random.shuffle(self.condition)
 
@@ -218,10 +211,6 @@ class main_window(QWidget):
         self.textbox_y.move(60, 20)
         self.textbox_y.resize(40, 20)
 
-        #self.textbox_t = QLineEdit(self)
-        #self.textbox_t.move(window_size_x/2, window_size_y/2)
-        #self.textbox_t.resize(70, 20)
-
         #実験条件の変更
         #ターゲット数 = num_of_target の変更(初期値:13)
         self.num_of_targets_label = QLabel(self)
@@ -232,26 +221,15 @@ class main_window(QWidget):
         self.set_num_of_target.setText(str(self.num_of_targets))
         self.set_num_of_target.resize(100, 20)
 
-        #全体の円の半径 = radius の変更(初期値:300)
-        self.radius_label = QLabel(self)
-        self.radius_label.setText("タスク番号")
-        self.radius_label.move(350, 0)
-        self.set_radius = QLineEdit(self)
-        self.set_radius.move(350, 20)
-        self.set_radius.setText(str(self.pixel_to_cmetre(self.radius)))
-        self.set_radius.resize(100, 20)
+        #全体の円の半径 = t_distance の変更(初期値:300)
+        self.t_distance_label = QLabel(self)
+        self.t_distance_label.setText("タスク番号")
+        self.t_distance_label.move(350, 0)
+        self.set_t_distance = QLineEdit(self)
+        self.set_t_distance.move(350, 20)
+        self.set_t_distance.setText(str(self.pixel_to_cmetre(self.t_distance)))
+        self.set_t_distance.resize(100, 20)
 
-        '''
-        #ターゲット数 = target_radius の変更(初期値:40)
-        self.target_radius_label = QLabel(self)
-        self.target_radius_label.setText("W = ")
-        self.target_radius_label.move(500, 0)
-        self.set_target_radius = QLineEdit(self)
-        self.set_target_radius.move(500, 20)
-        self.set_target_radius.setText(
-            str(self.pixel_to_cmetre(self.target_radius)))
-        self.set_target_radius.resize(100, 20)
-        '''
 
         #実験条件の変更の反映
         self.button_exec = QPushButton(self)
@@ -261,7 +239,7 @@ class main_window(QWidget):
 
         self.cursor_hider = QCursor(QPixmap("bitmap.png"))
 
-    #実験データ収集用
+    #実験データ収集
     #操作時間計測
     def data_log(self):
         if self.exp_start_flag:
@@ -315,8 +293,8 @@ class main_window(QWidget):
                     exit(1)
         print(str(self.session_num) + "-" + str(self.task_num))
         self.num_of_targets = int(self.set_num_of_target.text())
-        self.radius = self.cmetre_to_pixel(self.condition[self.task_num][0]/2)
-        self.target_radius = self.cmetre_to_pixel(self.condition[self.task_num][1]/2)
+        self.t_distance = self.cmetre_to_pixel(self.condition[self.task_num][0]/2)
+        self.t_width = self.cmetre_to_pixel(self.condition[self.task_num][1]/2)
         self.set_target()
         self.exp_timer_init()
         
@@ -329,31 +307,24 @@ class main_window(QWidget):
 
     def paintEvent(self, QPaintEvent):
         painter = QPainter(self)
-        self.textbox_x.setText(str(int(self.x)))  # 座標確認用
-        self.textbox_y.setText(str(int(self.y)))  # 座標確認用
-        self.set_radius.setText(str(self.task_num))
+        self.textbox_x.setText(str(int(self.x)))  
+        self.textbox_y.setText(str(int(self.y)))  
+        self.set_t_distance.setText(str(self.task_num))
         painter.setPen(Qt.black)
-        #painter.setBrush(Qt.red)
-        #painter.drawEllipse(self.x, self.y, pointer_size, pointer_size)
         
         if self.exp_start_flag:
             painter.setBrush(QColor(0xee, 0xee, 0xee)) #背景と同じ色
             for i in range(self.num_of_targets):
                 painter.drawEllipse(
-                    self.target_point[i], self.target_radius, self.target_radius)
+                    self.target_point[i], self.t_width, self.t_width)
             painter.setBrush(QColor(0x48, 0xcb, 0xeb)) #青
             painter.drawEllipse(
-                self.target_point[self.target_order[self.order_num]], self.target_radius, self.target_radius)
+                self.target_point[self.target_order[self.order_num]], self.t_width, self.t_width)
         else:
             painter.setBrush(QColor(0xff, 0xaa, 0x00)) #オレンジ
             for i in range(self.num_of_targets):
                 painter.drawEllipse(
-                    self.target_point[i], self.target_radius, self.target_radius)
-        #if self.collision_flag:
-            #painter.setBrush(Qt.white)
-            #painter.drawEllipse(
-                #self.target_point[self.collision_nums], self.target_radius, self.target_radius)
-        #self.textbox_t.setText(str(self.collision_flag))
+                    self.target_point[i], self.t_width, self.t_width)
         painter.setBrush(Qt.red)
         painter.drawEllipse(QPoint(self.x, self.y), pointer_size, pointer_size)
 
@@ -406,22 +377,25 @@ class main_window(QWidget):
                     sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
             self.old_ema = self.new_ema
         sensor_val = self.new_ema
-        #指数平均平滑フィルタ
+
         n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
+        #上のフィルタはセンサ値に対して行っているが、こちらのフィルタは、EMAを通過したセンサ値を記録している
         for i in range(wait_flame-1):
             self.sensor_flt[i+1, :] = self.sensor_flt[i, :]
         max_val = np.max(sensor_val)
         near_snum = []
+
+        #センサ値を全て座標値に反映させるとカーソルがブレるので、安定させるために細工している
         for v in range(num_of_sensor):
-            if sensor_val[v] < (max_val) * 0.6:
-                self.sensor_flt[0, v] = sensor_val[v]*0.1
+            if sensor_val[v] < (max_val) * 0.6: #0.6は調整の結果
+                self.sensor_flt[0, v] = sensor_val[v]*0.1 #0にすると動きが離散的になってしまう
             else:
                 near_snum.append(v)
                 self.sensor_flt[0, v] = sensor_val[v]
         for v in range(num_of_sensor):
             if v in near_snum:
                 n_sensor_val[v] = np.average(self.sensor_flt[:, v])
-
+            #離散的な動きにならないようにしている
             else:
                 n_sensor_val[v] = np.average(
                     self.sensor_flt[[1, wait_flame-1], v])*0.9 + self.sensor_flt[0, v] * 0.1
@@ -430,8 +404,7 @@ class main_window(QWidget):
             #y座標計算
             top_sensor = np.argsort(-sensor_val)
             self.new_y = max(sensor_val)
-            #self.new_y = (window_size_y) * (59.0 - sensor_val[int(np.median(near_snum))]) / 59.0-52.0
-            #self.new_y = (window_size_y) * (59.0 - np.average([sensor_val[v] for v in near_snum])) / 59.0-52.0
+           
 
             #x座標計算
             for i in range(num_of_sensor):
@@ -446,6 +419,7 @@ class main_window(QWidget):
             #print(self.new_x)
 
             #座標平滑フィルタ
+            #xとyで分けてるだけ
             if self.old_x == window_size_x / 2:
                 self.old_x = self.new_x
             else:
@@ -459,8 +433,9 @@ class main_window(QWidget):
                 self.old_y = self.new_y
 
         return self.new_x, self.new_y
+    
     #左方向キャリブレーション
-
+    #早くも遅くもないフレーム数が100Fくらい？調整の結果
     def calibration_left(self):
         x = 0
         y = 0
@@ -543,7 +518,6 @@ class main_window(QWidget):
 
 
     def value_upd(self):
-        #print(self.left_limit, self.right_limit,self.upper_limit, self.lower_limit)
         self.value_init()
         self.new_x = 0
         not_update = True
@@ -559,46 +533,35 @@ class main_window(QWidget):
                 break
 
         if self.calibration_check():
-            '''
-            if self.slower_mode:
-                x, y = self.pointer_calc(
-                    sensor_val, self.left_limit, self.right_limit, self.upper_limit, self.lower_limit, self.leg_flag)
-                self.x = self.xs + int(((x - self.xs) / window_size_x) * 100)
-                self.y = self.ys + int(((y - self.ys) / window_size_y) * 100)
-
-
+            self.new_x, self.new_y = self.pointer_calc(sensor_val)
+            if self.new_x < self.center_posx:
+                self.x = self.my_map(
+                    self.new_x, self.left_limit, self.center_posx, 0, window_size_x/2)
             else:
-            '''
-            if self.calibration_check():
-                self.new_x, self.new_y = self.pointer_calc(sensor_val)
-                if self.new_x < self.center_posx:
-                    self.x = self.my_map(
-                        self.new_x, self.left_limit, self.center_posx, 0, window_size_x/2)
-                else:
-                    self.x = self.my_map(
-                        self.new_x, self.center_posx, self.right_limit, window_size_x/2, window_size_x)
+                self.x = self.my_map(
+                    self.new_x, self.center_posx, self.right_limit, window_size_x/2, window_size_x)
 
-                if self.new_y < self.center_posy:
-                    self.y = self.my_map(
-                        self.new_y, self.upper_limit, self.center_posy, 0, window_size_y/2)
-                else:
-                    self.y = self.my_map(
-                        self.new_y, self.center_posy, self.lower_limit, window_size_y/2, window_size_y)
+            if self.new_y < self.center_posy:
+                self.y = self.my_map(
+                    self.new_y, self.upper_limit, self.center_posy, 0, window_size_y/2)
+            else:
+                self.y = self.my_map(
+                    self.new_y, self.center_posy, self.lower_limit, window_size_y/2, window_size_y)
 
-                if self.x < 0:
-                    self.x = 0
-                elif self.x > window_size_x:
-                    self.x = window_size_x
-                if self.y < 0:
-                    self.y = 0
-                elif self.y > window_size_y:
-                    self.y = window_size_y
-                #pyautogui.moveTo(self.x, self.y)
+            if self.x < 0:
+                self.x = 0
+            elif self.x > window_size_x:
+                self.x = window_size_x
+            if self.y < 0:
+                self.y = 0
+            elif self.y > window_size_y:
+                self.y = window_size_y
+            #pyautogui.moveTo(self.x, self.y)
         #衝突判定
-                self.collision_flag = ((self.x - self.target_point[self.target_order[self.order_num]].x()) * (self.x - self.target_point[self.target_order[self.order_num]].x())) + (
-                    (self.y - self.target_point[self.target_order[self.order_num]].y()) * (self.y - self.target_point[self.target_order[self.order_num]].y())) <= (self.target_radius + pointer_size) * (self.target_radius + pointer_size)
-                self.update()
-                self.data_log()
+            self.collision_flag = ((self.x - self.target_point[self.target_order[self.order_num]].x()) * (self.x - self.target_point[self.target_order[self.order_num]].x())) + (
+                (self.y - self.target_point[self.target_order[self.order_num]].y()) * (self.y - self.target_point[self.target_order[self.order_num]].y())) <= (self.t_width + pointer_size) * (self.t_width + pointer_size)
+            self.update()
+            self.data_log()
 
     def main(self):
         self.show()
