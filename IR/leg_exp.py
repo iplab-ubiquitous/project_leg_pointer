@@ -22,10 +22,10 @@ wait_flame = 100
 alpha = 0.1
 beta = 0.65
 pointer_size = 8
-ppi = 128       #macbookpro 13.3 2018 1440*900
+#ppi = 128       #macbookpro 13.3 2018 1440*900
 #ppi = 102.42   #研究室のDELLのディスプレイ
 #ppi = 94.0     #家のディスプレイ(EV2455)
-#ppi = 91.788   #S2409Wb(24inch 1920*1080)
+ppi = 91.788   #S2409Wb(24inch 1920*1080)
 
 output_path_log = 'exp_data/leg/log_p3_l3_leg.csv'
 output_path_data = 'exp_data/leg/data_p3_l3_leg.csv'
@@ -138,7 +138,7 @@ class main_window(QWidget):
         self.set_target()
 
         #実験条件[D,W] ランダムシャッフルで順番を決定しセッションごとに自動で呼び出し
-        self.condition = [[3.0, 2.5], [3.0, 1.5], [3.0, 0.5], [12.0, 2.5], [12.0, 1.5], [12.0, 0.5], [24.0, 2.5], [24.0, 1.5], [24.0, 0.5]]
+        self.condition = [[3.0, 0.8], [3.0, 1.8], [3.0, 2.4], [15.0, 0.8], [15.0, 1.8], [15.0, 2.4], [26.0, 0.8], [26.0, 1.8], [26.0, 2.4]]
         random.shuffle(self.condition)
 
         
@@ -258,6 +258,7 @@ class main_window(QWidget):
             tm = time.time()-self.tstamp
             _id = math.log2(1+self.condition[self.task_num][0]/self.condition[self.task_num][1])
             ofs = self.calc_amplitude(self.x, self.target_point[self.target_order[self.order_num]].x(), self.y, self.target_point[self.target_order[self.order_num]].y())
+            ofs = pixel_to_cmetre(ofs)
             self.data = np.append(self.data, np.array([[self.session_num, self.task_num, self.order_num, tm, _id, self.miss_flag, ofs]]), axis=0)
             
         self.tstamp = time.time()
@@ -368,6 +369,7 @@ class main_window(QWidget):
     def pointer_calc(self, sensor_val):
         #print(left_limit, right_limit, upper_limit, lower_limit)
 
+        
         #指数平均平滑フィルタ
         if np.allclose(self.old_ema, np.zeros(num_of_sensor, dtype=np.float)):
             self.old_ema = sensor_val
@@ -377,13 +379,14 @@ class main_window(QWidget):
                     sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
             self.old_ema = self.new_ema
         sensor_val = self.new_ema
-
+        
         n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         #上のフィルタはセンサ値に対して行っているが、こちらのフィルタは、EMAを通過したセンサ値を記録している
         for i in range(wait_flame-1):
             self.sensor_flt[i+1, :] = self.sensor_flt[i, :]
         max_val = np.max(sensor_val)
         near_snum = []
+        
 
         #センサ値を全て座標値に反映させるとカーソルがブレるので、安定させるために細工している
         for v in range(num_of_sensor):
