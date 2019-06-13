@@ -24,7 +24,7 @@ output_path = 'data_p0_leg.csv'
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem141201', 460800)
+        self.ser = serial.Serial('/dev/cu.usbmodem142201', 460800)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 

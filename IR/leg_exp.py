@@ -27,12 +27,12 @@ pointer_size = 8
 #ppi = 94.0     #家のディスプレイ(EV2455)
 ppi = 91.788   #S2409Wb(24inch 1920*1080)
 
-output_path_log = 'exp_data/leg/log_p3_l3_leg.csv'
-output_path_data = 'exp_data/leg/data_p3_l3_leg.csv'
+output_path_log = 'exp_data/leg/log_p1_right_leg.csv'
+output_path_data = 'exp_data/leg/data_p1_right_leg.csv'
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem141301', 460800)
+        self.ser = serial.Serial('/dev/cu.usbmodem142201', 460800)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -129,8 +129,8 @@ class main_window(QWidget):
         self.miss_flag = False
         self.clicked = 0
         self.amplitude = 0
-        self.logger = np.empty((0, 6), float)
-        self.data = np.empty((0, 7), float)
+        self.logger = np.empty((0, 10), float)
+        self.data = np.empty((0, 14), float)
 
         #衝突判定とターゲット位置計算
         self.collision_flag = False
@@ -243,11 +243,10 @@ class main_window(QWidget):
     #操作時間計測
     def data_log(self):
         if self.exp_start_flag:
-            dist = self.calc_amplitude(
-                self.target_point[self.target_order[self.order_num]].x(), self.x, self.target_point[self.target_order[self.order_num]].y(), self.y)
+            _id = math.log2(1+self.condition[self.task_num][0]/self.condition[self.task_num][1])
             tm = time.time()-self.start
             self.logger = np.append(self.logger, np.array(
-                [[self.task_num,  self.x, self.y, self.clicked, self.miss, tm]]), axis=0)
+                [[self.session_num, self.task_num, self.order_num, self.miss, self.cmetre_to_pixel(self.condition[self.task_num][0]), self.cmetre_to_pixel(self.condition[self.task_num][1]), _id, tm, self.x, self.y]]), axis=0)
             self.miss_flag = False
     def exp_timer_init(self):
         self.start = 0
@@ -257,24 +256,29 @@ class main_window(QWidget):
         if self.order_num > 0:
             tm = time.time()-self.tstamp
             _id = math.log2(1+self.condition[self.task_num][0]/self.condition[self.task_num][1])
-            ofs = self.calc_amplitude(self.x, self.target_point[self.target_order[self.order_num]].x(), self.y, self.target_point[self.target_order[self.order_num]].y())
-            ofs = pixel_to_cmetre(ofs)
-            self.data = np.append(self.data, np.array([[self.session_num, self.task_num, self.order_num, tm, _id, self.miss_flag, ofs]]), axis=0)
-            
+            #ofs = self.calc_amplitude(self.x, self.target_point[self.target_order[self.order_num]].x(), self.y, self.target_point[self.target_order[self.order_num]].y())
+            #ofs = pixel_to_cmetre(ofs)
+            x_end = self.x
+            y_end = self.y
+            self.data = np.append(self.data, np.array([[self.session_num, self.task_num, self.order_num, tm, self.cmetre_to_pixel(self.condition[self.task_num][0]), self.cmetre_to_pixel(self.condition[self.task_num][1]),_id, self.miss_flag, \
+                self.xs, self.ys, self.x, self.y, self.target_point[self.target_order[self.order_num]].x(), self.target_point[self.target_order[self.order_num]].y()]]), axis=0)
+        self.xs = self.x
+        self.ys = self.y
         self.tstamp = time.time()
+        
     def exp_timer_stop(self):
         self.exp_start_flag = False
         self.exp_end_flag = True
         QApplication.setOverrideCursor(Qt.ArrowCursor)
-
+        _id = math.log2(1+self.condition[self.task_num][0]/self.condition[self.task_num][1])
         tm = time.time()-self.start
         self.logger = np.append(self.logger, np.array(
-            [[self.task_num, self.x, self.y, self.clicked, self.miss, tm]]), axis=0)
+                [[self.session_num, self.task_num, self.order_num, self.miss, self.cmetre_to_pixel(self.condition[self.task_num][0]), self.cmetre_to_pixel(self.condition[self.task_num][1]), _id, tm, self.x, self.y]]), axis=0)
         print('selection miss: ' + str(self.miss) + ' time(s)')
         np.savetxt(output_path_log, self.logger, delimiter=',', fmt=[
-                   '%.0f', '%.0f', '%.0f', '%.0f', '%.0f', '%.3f'], header='exp_num, x, y, keypress, missed, time', comments='')
+                   '%.0f', '%.0f', '%.0f', '%.0f', '%.1f', '%.1f', '%.3f', '%.3f', '%.3f', '%.3f'], header='session_num, task_num, try_num, miss, D, W, ID, time, x, y', comments='')
         np.savetxt(output_path_data, self.data, delimiter=',', fmt=[
-                '%.0f', '%.0f', '%.0f', '%.3f', '%.3f', '%.0f', '%.3f'], header='session_num, task_num, try_num, time, ID, miss, offset', comments='')
+                '%.0f', '%.0f', '%.0f', '%.3f', '%.1f', '%.1f', '%.3f', '%.0f', '%.3f', '%.3f', '%.3f', '%.3f', '%.0f', '%.0f'], header='session_num, task_num, try_num, time, D, W, ID, miss, x_start, y_start, x_end, y_end, x_target, y_target', comments='')
         self.exp_timer_init()
 
     def calc_amplitude(self, x1, x2, y1, y2):
@@ -356,12 +360,6 @@ class main_window(QWidget):
 
         if keyevent.key() == Qt.Key_Shift:
             self.set_target_config()
-
-    def keyReleaseEvent(self, keyevent):
-        if keyevent.key() == Qt.Key_Shift:
-            self.slower_mode = False
-            self.x = self.xs
-            self.y = self.ys
     
     def my_map(self, val, in_min, in_max, out_min, out_max):
         return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
