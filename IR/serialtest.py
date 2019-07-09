@@ -11,6 +11,7 @@ import serial
 import numpy as np
 import random
 import time
+import statistics
 
 window_size_x = 1440   
 window_size_y = 900
@@ -24,7 +25,7 @@ output_path = 'data_p0_leg.csv'
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem142201', 460800)
+        self.ser = serial.Serial('/dev/cu.usbmodem141201', 460800)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -49,8 +50,17 @@ class main_window(QWidget):
         self.n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         self.weight = ([1.00] * num_of_sensor)
 
+        self.med_filter = np.zeros((num_of_sensor, 10), dtype=np.float)
+
+        self.kalman_dp = np.zeros(num_of_sensor, dtype=np.float)
+        self.kalman_pp = np.full(num_of_sensor,64, dtype=np.float) 
+        self.kalman_gain = np.zeros(num_of_sensor, dtype=np.float)
+        self.sigma_W = np.full(10,10, dtype=np.float)
+        self.sigma_V = np.full(10,5, dtype=np.float)
+
     #指数平均平滑フィルタ変数のリセット(本当は必要ないかもしれない)
     def ema_reset(self):
+
         self.old_ema = np.zeros(num_of_sensor, dtype=np.float)
         self.new_ema = np.zeros(num_of_sensor, dtype=np.float)
         self.new_x = 0
@@ -88,8 +98,8 @@ class main_window(QWidget):
 
         for i in range(num_of_sensor):
             painter.drawRect(window_size_x / 12 * (i+1), window_size_y -
-                             (self.n_sensor_val[i])*10-100, 40,  (self.n_sensor_val[i])*10)
-            self.val[i].setText(str(round(self.n_sensor_val[i], 2)))
+                             (self.sensor_val[i])*10-100, 40,  (self.sensor_val[i])*10)
+            self.val[i].setText(str(round(self.sensor_val[i], 2)))
 
 
     
@@ -98,25 +108,50 @@ class main_window(QWidget):
         #print(self.left_limit, self.right_limit,self.upper_limit, self.lower_limit)
         tmp = rd.read_test_ser()
         self.sensor_val = [64-float(v) for v in tmp]
-        
-
-
         #指数平均平滑フィルタ
-        if np.allclose(self.old_ema, np.zeros(num_of_sensor, dtype=np.float)):
-            self.old_ema = self.sensor_val
-        else:
-            for i in range(num_of_sensor):
-                self.new_ema[i] = (
-                    self.sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
-            self.old_ema = self.new_ema
+        # if np.allclose(self.old_ema, np.zeros(num_of_sensor, dtype=np.float)):
+        #     self.old_ema = self.sensor_val
+        # else:
+        #     for i in range(num_of_sensor):
+        #         self.new_ema[i] = (
+        #             self.sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
+        #         self.sensor_val[i] = self.new_ema[i]
+        #     self.old_ema = self.new_ema
+        #指数平均平滑フィルタ
 
-        
+        # メディアンフィルタ
+        # self.med_filter = np.roll(self.med_filter, 1, axis=0)
+        # self.med_filter[0] = self.sensor_val
+
+        # for i in range(num_of_sensor):
+        #     self.sensor_val[i] = statistics.median(self.med_filter[:,i])
+
+        # カルマンフィルタ
         for i in range(num_of_sensor):
-            if self.new_ema[i] < 0:
-                self.n_sensor_val[i] =0
-            else:
-                self.n_sensor_val[i] = self.new_ema[i]
-        #指数平均平滑フィルタ
+            d_predict = self.kalman_dp[i]
+            p_predict = self.kalman_pp[i] - self.sigma_W[i]
+            self.kalman_gain[i] = p_predict / (p_predict + self.sigma_V[i])
+
+            self.kalman_dp[i] = d_predict + self.kalman_gain[i] * (self.sensor_val[i] - d_predict)
+            self.kalman_pp[i] = (1-self.kalman_gain[i]) * p_predict
+
+            self.sensor_val[i] = self.kalman_dp[i] 
+            if self.sensor_val[i] < 0:
+                self.sensor_val[i] = 0
+        
+
+        
+
+        
+
+        
+
+
+        
+            
+        
+
+
         '''
         a = self.sensor_val
         top_sensor = np.argsort(-a)

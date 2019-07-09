@@ -12,6 +12,7 @@ import pyautogui
 import numpy as np
 import random
 import time
+import statistics
 
 window_size_x = 1920        
 window_size_y = 1080
@@ -27,12 +28,12 @@ pointer_size = 8
 #ppi = 94.0     #家のディスプレイ(EV2455)
 ppi = 91.788   #S2409Wb(24inch 1920*1080)
 
-output_path_log = 'exp_data/leg/log_p1_right_leg.csv'
-output_path_data = 'exp_data/leg/data_p1_right_leg.csv'
+output_path_log = 'exp_data/leg/log_p0_left_leg.csv'
+output_path_data = 'exp_data/leg/data_p0_left_leg.csv'
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem142201', 460800)
+        self.ser = serial.Serial('/dev/cu.usbmodem141201', 460800)
         for i in range(10):
             self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
 
@@ -100,6 +101,12 @@ class main_window(QWidget):
         self.old_x = window_size_x / 2
         self.new_y = 0
         self.old_y = window_size_y / 2
+
+        #メディアンフィルタ用
+        self.med_filter_d = np.zeros((num_of_sensor, 10), dtype=np.float)
+        self.med_filter_x = np.zeros(10, dtype=np.float)
+        self.med_filter_y = np.zeros(10, dtype=np.float)
+
 
         #低速モード用フラグ
         self.slower_mode = False
@@ -375,9 +382,17 @@ class main_window(QWidget):
             for i in range(num_of_sensor):
                 self.new_ema[i] = (
                     sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
-            self.old_ema = self.new_ema
-        sensor_val = self.new_ema
+                sensor_val[i] = self.new_ema[i]
+        self.old_ema = self.new_ema
+
+        # メディアンフィルタ
+        self.med_filter_d = np.roll(self.med_filter_d, 1, axis=0)
+        self.med_filter_d[0] = sensor_val
+
+        for i in range(num_of_sensor):
+            sensor_val[i] = statistics.median(self.med_filter_d[:,i])
         
+        ''' 
         n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         #上のフィルタはセンサ値に対して行っているが、こちらのフィルタは、EMAを通過したセンサ値を記録している
         for i in range(wait_flame-1):
@@ -386,6 +401,7 @@ class main_window(QWidget):
         near_snum = []
         
 
+        
         #センサ値を全て座標値に反映させるとカーソルがブレるので、安定させるために細工している
         for v in range(num_of_sensor):
             if sensor_val[v] < (max_val) * 0.6: #0.6は調整の結果
@@ -400,17 +416,18 @@ class main_window(QWidget):
             else:
                 n_sensor_val[v] = np.average(
                     self.sensor_flt[[1, wait_flame-1], v])*0.9 + self.sensor_flt[0, v] * 0.1
+        '''
 
         if self.leg_flag:
             #y座標計算
-            top_sensor = np.argsort(-sensor_val)
+            # top_sensor = np.argsort(-sensor_val)
             self.new_y = max(sensor_val)
            
 
             #x座標計算
-            for i in range(num_of_sensor):
-                if i > 6:
-                    sensor_val[top_sensor[i]] = 0
+            # for i in range(num_of_sensor):
+            #     if i > 6:
+            #         sensor_val[top_sensor[i]] = 0
             for i in range(num_of_sensor):
                 self.weight[i] = 1 / (max(sensor_val) - sensor_val[i] + 2)
             s = sum(self.weight)
@@ -419,19 +436,23 @@ class main_window(QWidget):
                 self.new_x += ((j * self.weight[j] / s))
             #print(self.new_x)
 
-            #座標平滑フィルタ
+            #座標に対するフィルタ
+            #指数移動平均フィルタ
             #xとyで分けてるだけ
-            if self.old_x == window_size_x / 2:
-                self.old_x = self.new_x
-            else:
-                self.new_x = (self.new_x - self.old_x) * alpha + self.old_x
-                self.old_x = self.new_x
+            self.new_x = (self.new_x - self.old_x) * alpha + self.old_x
+            self.old_x = self.new_x
 
-            if self.old_y == window_size_y / 2:
-                self.old_y = self.new_y
-            else:
-                self.new_y = (self.new_y - self.old_y) * beta + self.old_y
-                self.old_y = self.new_y
+            self.new_y = (self.new_y - self.old_y) * beta + self.old_y
+            self.old_y = self.new_y
+
+            #メディアンフィルタ
+            # self.med_filter_x = np.roll(self.med_filter_x, 1)
+            # self.med_filter_x[0] = self.new_x
+            # self.new_x = statistics.median(self.med_filter_x)
+
+            # self.med_filter_y = np.roll(self.med_filter_y, 1)
+            # self.med_filter_y[0] = self.new_y
+            # self.new_y = statistics.median(self.med_filter_y)
 
         return self.new_x, self.new_y
     
