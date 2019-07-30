@@ -12,22 +12,23 @@ import numpy as np
 import random
 import time
 import statistics
+import csv
 
 window_size_x = 1440   
 window_size_y = 900
 #window_size = QtGui.qApp.desktop().width()
 num_of_sensor = 10
 wait_flame = 100
-alpha = 0.1
+alpha = 0.7
 pointer_size = 20
-output_path = 'data_p0_leg.csv'
+output_path = 'testLogger.csv'
 
 
 class sensor_read:
     def __init__(self):
         self.ser = serial.Serial('/dev/cu.usbmodem141201', 460800)
         for i in range(10):
-            self.ser.readline()  # 読み飛ばし(欠けたデータが読み込まれるのを避ける)
+            self.ser.readline()
 
     def read_test_ser(self):
         lst = float(0)
@@ -37,7 +38,7 @@ class sensor_read:
         #line_f = [float(s) for s in self.line]
         #return line_f
 
-        print(lst)
+        # print(lst)
         return lst
 
 
@@ -55,8 +56,8 @@ class main_window(QWidget):
         self.kalman_dp = np.zeros(num_of_sensor, dtype=np.float)
         self.kalman_pp = np.full(num_of_sensor,64, dtype=np.float) 
         self.kalman_gain = np.zeros(num_of_sensor, dtype=np.float)
-        self.sigma_W = np.full(10,10, dtype=np.float)
-        self.sigma_V = np.full(10,5, dtype=np.float)
+        self.sigma_W = np.full(10,5, dtype=np.float)
+        self.sigma_V = np.full(10,70, dtype=np.float)
 
     #指数平均平滑フィルタ変数のリセット(本当は必要ないかもしれない)
     def ema_reset(self):
@@ -88,7 +89,10 @@ class main_window(QWidget):
 
 
         #実験データ収集用
+        self.logger = np.empty([0,10], float)
         #操作時間計測
+
+        self.classifier = self.classify_knee()
 
 
     def paintEvent(self, QPaintEvent):
@@ -101,22 +105,67 @@ class main_window(QWidget):
                              (self.sensor_val[i])*10-100, 40,  (self.sensor_val[i])*10)
             self.val[i].setText(str(round(self.sensor_val[i], 2)))
 
+    def classify_knee(self):
+        from sklearn import svm, neighbors, metrics, preprocessing
+        from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
+        from sklearn.metrics import classification_report, accuracy_score
+        import pandas as pd
 
-    
+        tuned_parameters = [
+            {'C': [1, 10, 100, 1000], 'kernel': ['linear']}, 
+            {'C': [1, 10, 100, 1000], 'kernel': ['rbf'], 'gamma': [0.001, 0.0001]}, 
+            {'C': [1, 10, 100, 1000], 'kernel': ['poly'], 'degree': [2, 3, 4], 'gamma': [0.001, 0.0001]}, 
+            {'C': [1, 10, 100, 1000], 'kernel': ['sigmoid'], 'gamma': [0.001, 0.0001]}
+            ]
+
+        dataset1 = pd.read_csv("testLogger_one.csv", header=None)
+        dataset1['Label'] = 1
+        dataset2 = pd.read_csv("testLogger_two.csv", header=None)
+        dataset2['Label'] = 2
+
+        dataset = pd.concat([dataset1, dataset2])
+
+
+
+        data_train, data_test = train_test_split(dataset, test_size=0.2)
+
+        train_label = data_train['Label']
+        train_data = data_train.iloc[:,0:10]
+
+        # print(train_data, train_label)
+
+        test_label = data_test['Label']
+        test_data = data_test.iloc[:, 0:10]
+
+        classifier = GridSearchCV(svm.SVC(),            # 使用したいモデル
+                                  tuned_parameters,  # 最適化したいパラメータ
+                                  cv=5,  # 交差検証の回数
+                                  scoring='recall'  # 評価関数の指定
+                                  )
+        classifier.fit(train_data, train_label)
+        print(classifier.best_estimator_)
+        print(classification_report(test_label, classifier.predict(test_data)))
+
+        return classifier
+
     def value_upd(self):
         
         #print(self.left_limit, self.right_limit,self.upper_limit, self.lower_limit)
         tmp = rd.read_test_ser()
         self.sensor_val = [64-float(v) for v in tmp]
+        # print(np.array(self.sensor_val).size)
+        self.logger = np.append(self.logger, np.array(self.sensor_val).reshape(1,10), axis=0)
+        
+        
         #指数平均平滑フィルタ
-        # if np.allclose(self.old_ema, np.zeros(num_of_sensor, dtype=np.float)):
-        #     self.old_ema = self.sensor_val
-        # else:
-        #     for i in range(num_of_sensor):
-        #         self.new_ema[i] = (
-        #             self.sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
-        #         self.sensor_val[i] = self.new_ema[i]
-        #     self.old_ema = self.new_ema
+        if np.allclose(self.old_ema, np.zeros(num_of_sensor, dtype=np.float)):
+            self.old_ema = self.sensor_val
+        else:
+            for i in range(num_of_sensor):
+                self.new_ema[i] = (
+                    self.sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
+                self.sensor_val[i] = self.new_ema[i]
+            self.old_ema = self.new_ema
         #指数平均平滑フィルタ
 
         # メディアンフィルタ
@@ -127,75 +176,43 @@ class main_window(QWidget):
         #     self.sensor_val[i] = statistics.median(self.med_filter[:,i])
 
         # カルマンフィルタ
-        for i in range(num_of_sensor):
-            d_predict = self.kalman_dp[i]
-            p_predict = self.kalman_pp[i] - self.sigma_W[i]
-            self.kalman_gain[i] = p_predict / (p_predict + self.sigma_V[i])
+        # for i in range(num_of_sensor):
+        #     d_predict = self.kalman_dp[i]
+        #     p_predict = self.kalman_pp[i] - self.sigma_W[i]
+        #     self.kalman_gain[i] = p_predict / (p_predict + self.sigma_V[i])
 
-            self.kalman_dp[i] = d_predict + self.kalman_gain[i] * (self.sensor_val[i] - d_predict)
-            self.kalman_pp[i] = (1-self.kalman_gain[i]) * p_predict
+        #     self.kalman_dp[i] = d_predict + self.kalman_gain[i] * (self.sensor_val[i] - d_predict)
+        #     self.kalman_pp[i] = (1-self.kalman_gain[i]) * p_predict
 
-            self.sensor_val[i] = self.kalman_dp[i] 
-            if self.sensor_val[i] < 0:
-                self.sensor_val[i] = 0
-        
+        #     self.sensor_val[i] = self.kalman_dp[i] 
+        #     if self.sensor_val[i] < 0:
+        #         self.sensor_val[i] = 0
 
-        
+        # メディアンフィルタ
+        # self.med_filter = np.roll(self.med_filter, 1, axis=0)
+        # self.med_filter[0] = self.sensor_val
 
-        
+        # for i in range(num_of_sensor):
+        #     self.sensor_val[i] = statistics.median(self.med_filter[:,i])
 
-        
+        # カルマンフィルタ
+        # for i in range(num_of_sensor):
+        #     d_predict = self.kalman_dp[i]
+        #     p_predict = self.kalman_pp[i] - self.sigma_W[i]
+        #     self.kalman_gain[i] = p_predict / (p_predict + self.sigma_V[i])
 
+        #     self.kalman_dp[i] = d_predict + self.kalman_gain[i] * (self.sensor_val[i] - d_predict)
+        #     self.kalman_pp[i] = (1-self.kalman_gain[i]) * p_predict
 
-        
-            
-        
-
-
-        '''
-        a = self.sensor_val
-        top_sensor = np.argsort(-a)
-        sv_ydata = [top_sensor[i] for i in range(num_of_sensor) if i < 3]
-        print(sv_ydata)
-        
-        for i in range(10):
-            if i > 4:
-                self.n_sensor_val[top_sensor[i]] = 0
-            else:
-                self.n_sensor_val[top_sensor[i]] = self.sensor_val[top_sensor[i]]
-        
-        for i in range(wait_flame-1):
-            self.sensor_flt[i+1,:] = self.sensor_flt[i,:]
-        
-        max_val = np.max(self.sensor_val)
-        near_snum = []
-        for v in range(num_of_sensor):
-            if self.sensor_val[v] < (max_val) * 0.25:
-                self.sensor_flt[0,v] = self.sensor_val[v]*0.3
-            else:
-                near_snum.append(v)
-                self.sensor_flt[0,v] = self.sensor_val[v]
-
-        for v in range(num_of_sensor):
-            if v in near_snum:
-                if np.max(self.sensor_flt[:, v])-np.min(self.sensor_flt[:, v]) < 5:
-                    self.n_sensor_val[v] = np.average(self.sensor_flt[:,v])
-                else:
-                    self.n_sensor_val[v] = np.average(
-                        self.sensor_flt[[1,wait_flame-1], v])*0.9 + self.sensor_flt[0, v] *0.1
-            else:
-                self.n_sensor_val[v] = self.sensor_flt[0,v]
-        '''
-
-        '''
-        for i1 in range(max_n-1, -1):
-            if self.sensor_val[i1]-20 > self.sensor_val[i1+1]:
-                self.sensor_val[i1] = 0
-        for i2 in range(max_n, num_of_sensor-1):
-            if self.sensor_val[i2] < self.sensor_val[i2+1]-20:
-                self.sensor_val[i2+1] = 0
-        '''
+        #     self.sensor_val[i] = self.kalman_dp[i] 
+        #     if self.sensor_val[i] < 0:
+        #         self.sensor_val[i] = 0
         #print(self.sensor_flt[:,5])
+        knee_num = self.classifier.predict(np.array(self.sensor_val).reshape(1,-1))
+        if knee_num == 1:
+            print("Single")
+        elif knee_num == 2:
+            print("Double")
         self.update()
 
 
@@ -203,6 +220,7 @@ class main_window(QWidget):
     def main(self):
         self.show()
         app.exec_()
+        np.savetxt(output_path, self.logger, delimiter=',', fmt='%.2f')
 
 rd = sensor_read()
 app = QApplication(sys.argv)

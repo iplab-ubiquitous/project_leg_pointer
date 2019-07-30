@@ -20,7 +20,7 @@ window_size_y = 1080
 
 num_of_sensor = 10
 wait_flame = 100
-alpha = 0.1
+alpha = 0.7
 beta = 0.65
 pointer_size = 8
 #ppi = 128       #macbookpro 13.3 2018 1440*900
@@ -382,48 +382,21 @@ class main_window(QWidget):
             for i in range(num_of_sensor):
                 self.new_ema[i] = (
                     sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
-                sensor_val[i] = self.new_ema[i]
-        self.old_ema = self.new_ema
-
-        # メディアンフィルタ
-        self.med_filter_d = np.roll(self.med_filter_d, 1, axis=0)
-        self.med_filter_d[0] = sensor_val
-
-        for i in range(num_of_sensor):
-            sensor_val[i] = statistics.median(self.med_filter_d[:,i])
+            self.old_ema = self.new_ema
+        sensor_val = self.new_ema
         
-        ''' 
         n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         #上のフィルタはセンサ値に対して行っているが、こちらのフィルタは、EMAを通過したセンサ値を記録している
         for i in range(wait_flame-1):
             self.sensor_flt[i+1, :] = self.sensor_flt[i, :]
         max_val = np.max(sensor_val)
         near_snum = []
-        
-
-        
-        #センサ値を全て座標値に反映させるとカーソルがブレるので、安定させるために細工している
-        for v in range(num_of_sensor):
-            if sensor_val[v] < (max_val) * 0.6: #0.6は調整の結果
-                self.sensor_flt[0, v] = sensor_val[v]*0.1 #0にすると動きが離散的になってしまう
-            else:
-                near_snum.append(v)
-                self.sensor_flt[0, v] = sensor_val[v]
-        for v in range(num_of_sensor):
-            if v in near_snum:
-                n_sensor_val[v] = np.average(self.sensor_flt[:, v])
-            #離散的な動きにならないようにしている
-            else:
-                n_sensor_val[v] = np.average(
-                    self.sensor_flt[[1, wait_flame-1], v])*0.9 + self.sensor_flt[0, v] * 0.1
-        '''
 
         if self.leg_flag:
             #y座標計算
             # top_sensor = np.argsort(-sensor_val)
             self.new_y = max(sensor_val)
-           
-
+        
             #x座標計算
             # for i in range(num_of_sensor):
             #     if i > 6:
@@ -436,24 +409,17 @@ class main_window(QWidget):
                 self.new_x += ((j * self.weight[j] / s))
             #print(self.new_x)
 
-            #座標に対するフィルタ
-            #指数移動平均フィルタ
+            #座標平滑フィルタ
             #xとyで分けてるだけ
+
             self.new_x = (self.new_x - self.old_x) * alpha + self.old_x
             self.old_x = self.new_x
 
             self.new_y = (self.new_y - self.old_y) * beta + self.old_y
             self.old_y = self.new_y
 
-            #メディアンフィルタ
-            # self.med_filter_x = np.roll(self.med_filter_x, 1)
-            # self.med_filter_x[0] = self.new_x
-            # self.new_x = statistics.median(self.med_filter_x)
 
-            # self.med_filter_y = np.roll(self.med_filter_y, 1)
-            # self.med_filter_y[0] = self.new_y
-            # self.new_y = statistics.median(self.med_filter_y)
-
+        print("x: {}, y: {}".format(self.new_x, self.new_y))    
         return self.new_x, self.new_y
     
     #左方向キャリブレーション
@@ -462,7 +428,7 @@ class main_window(QWidget):
         x = 0
         y = 0
         if not self.left_calb_flag:
-            for i in range(100):
+            for i in range(60):
                 tmp = rd.read_test_ser()
                 val = [64-float(v) for v in tmp]
                 x, y = self.pointer_calc(val)
@@ -476,7 +442,7 @@ class main_window(QWidget):
         x = 0
         y = 0
         if not self.right_calb_flag:
-            for i in range(100):
+            for i in range(60):
                 tmp = rd.read_test_ser()
                 val = [64-float(v) for v in tmp]
                 x, y = self.pointer_calc(val)
@@ -490,7 +456,7 @@ class main_window(QWidget):
         x = 0
         y = 0
         if not self.center_calb_flag:
-            for i in range(100):
+            for i in range(60):
                 tmp = rd.read_test_ser()
                 val = [64-float(v) for v in tmp]
                 x, y = self.pointer_calc(val)
@@ -505,7 +471,7 @@ class main_window(QWidget):
         x = 0
         y = 0
         if not self.up_calb_flag:
-            for i in range(100):
+            for i in range(60):
                 tmp = rd.read_test_ser()
                 val = [64-float(v) for v in tmp]
                 x, y = self.pointer_calc(val)
@@ -519,7 +485,7 @@ class main_window(QWidget):
         x = 0
         y = 0
         if not self.down_calb_flag:
-            for i in range(100):
+            for i in range(60):
                 tmp = rd.read_test_ser()
                 val = [64-float(v) for v in tmp]
                 x, y = self.pointer_calc(val)
