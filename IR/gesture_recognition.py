@@ -21,12 +21,13 @@ num_of_sensor = 10
 wait_flame = 100
 alpha = 0.7
 pointer_size = 20
+gestures = 0
 output_path = 'testLogger.csv'
 
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem141201', 460800)
+        self.ser = serial.Serial('/dev/cu.usbmodem143301', 460800)
         for i in range(10):
             self.ser.readline()
 
@@ -34,11 +35,6 @@ class sensor_read:
         lst = float(0)
         while self.ser.in_waiting > 1 or lst == float(0):
             lst = self.ser.readline().strip().decode("utf-8").split(',')
-
-        #line_f = [float(s) for s in self.line]
-        #return line_f
-
-        # print(lst)
         return lst
 
 
@@ -50,14 +46,6 @@ class main_window(QWidget):
         self.sensor_flt = np.zeros((wait_flame,num_of_sensor), dtype=np.float)
         self.n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         self.weight = ([1.00] * num_of_sensor)
-
-        self.med_filter = np.zeros((num_of_sensor, 10), dtype=np.float)
-
-        self.kalman_dp = np.zeros(num_of_sensor, dtype=np.float)
-        self.kalman_pp = np.full(num_of_sensor,64, dtype=np.float) 
-        self.kalman_gain = np.zeros(num_of_sensor, dtype=np.float)
-        self.sigma_W = np.full(10,5, dtype=np.float)
-        self.sigma_V = np.full(10,70, dtype=np.float)
 
     #指数平均平滑フィルタ変数のリセット(本当は必要ないかもしれない)
     def ema_reset(self):
@@ -92,7 +80,7 @@ class main_window(QWidget):
         self.logger = np.empty([0,10], float)
         #操作時間計測
 
-        self.classifier = self.classify_knee()
+        # self.classifier = self.classify_knee()
 
 
     def paintEvent(self, QPaintEvent):
@@ -154,7 +142,7 @@ class main_window(QWidget):
         tmp = rd.read_test_ser()
         self.sensor_val = [64-float(v) for v in tmp]
         # print(np.array(self.sensor_val).size)
-        self.logger = np.append(self.logger, np.array(self.sensor_val).reshape(1,10), axis=0)
+        # self.logger = np.append(self.logger, np.array(self.sensor_val).reshape(1,10), axis=0)
         
         
         #指数平均平滑フィルタ
@@ -168,51 +156,7 @@ class main_window(QWidget):
             self.old_ema = self.new_ema
         #指数平均平滑フィルタ
 
-        # メディアンフィルタ
-        # self.med_filter = np.roll(self.med_filter, 1, axis=0)
-        # self.med_filter[0] = self.sensor_val
 
-        # for i in range(num_of_sensor):
-        #     self.sensor_val[i] = statistics.median(self.med_filter[:,i])
-
-        # カルマンフィルタ
-        # for i in range(num_of_sensor):
-        #     d_predict = self.kalman_dp[i]
-        #     p_predict = self.kalman_pp[i] - self.sigma_W[i]
-        #     self.kalman_gain[i] = p_predict / (p_predict + self.sigma_V[i])
-
-        #     self.kalman_dp[i] = d_predict + self.kalman_gain[i] * (self.sensor_val[i] - d_predict)
-        #     self.kalman_pp[i] = (1-self.kalman_gain[i]) * p_predict
-
-        #     self.sensor_val[i] = self.kalman_dp[i] 
-        #     if self.sensor_val[i] < 0:
-        #         self.sensor_val[i] = 0
-
-        # メディアンフィルタ
-        # self.med_filter = np.roll(self.med_filter, 1, axis=0)
-        # self.med_filter[0] = self.sensor_val
-
-        # for i in range(num_of_sensor):
-        #     self.sensor_val[i] = statistics.median(self.med_filter[:,i])
-
-        # カルマンフィルタ
-        # for i in range(num_of_sensor):
-        #     d_predict = self.kalman_dp[i]
-        #     p_predict = self.kalman_pp[i] - self.sigma_W[i]
-        #     self.kalman_gain[i] = p_predict / (p_predict + self.sigma_V[i])
-
-        #     self.kalman_dp[i] = d_predict + self.kalman_gain[i] * (self.sensor_val[i] - d_predict)
-        #     self.kalman_pp[i] = (1-self.kalman_gain[i]) * p_predict
-
-        #     self.sensor_val[i] = self.kalman_dp[i] 
-        #     if self.sensor_val[i] < 0:
-        #         self.sensor_val[i] = 0
-        #print(self.sensor_flt[:,5])
-        knee_num = self.classifier.predict(np.array(self.sensor_val).reshape(1,-1))
-        if knee_num == 1:
-            print("Single")
-        elif knee_num == 2:
-            print("Double")
         self.update()
 
 
@@ -228,4 +172,10 @@ window = main_window()
 
 
 if __name__ == '__main__':
-    window.main()
+    if len(sys.argv) < 2:
+        print("Input 1 argument. \nUsage: $python gesture_recognition.py 6")
+        exit(0)
+    else:
+        gestures = 1 + int(sys.argv[1])
+        print(gestures)
+        window.main()
