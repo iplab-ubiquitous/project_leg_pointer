@@ -60,6 +60,7 @@ class main_window(QWidget):
                 math.sin(2 * math.pi * (float(i) /
                                         self.num_of_targets) - (math.pi/2))
             self.target_point.append(QPoint(cx, cy))
+            print(QPoint( float((cx-window_size_x/2)/self.radius), float((cy-window_size_y/2)/self.radius)) )
     
     def cmetre_to_pixel(self, val):
         return val * (ppi*0.39370)
