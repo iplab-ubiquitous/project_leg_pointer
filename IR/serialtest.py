@@ -26,7 +26,7 @@ output_path = 'testLogger.csv'
 
 class sensor_read:
     def __init__(self):
-        self.ser = serial.Serial('/dev/cu.usbmodem141201', 460800)
+        self.ser = serial.Serial('/dev/cu.usbmodem141301', 460800)
         for i in range(10):
             self.ser.readline()
 

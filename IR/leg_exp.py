@@ -28,8 +28,8 @@ pointer_size = 8
 #ppi = 94.0     #家のディスプレイ(EV2455)
 ppi = 91.788   #S2409Wb(24inch 1920*1080)
 
-output_path_log = 'exp_data/leg/log_p0_left_leg.csv'
-output_path_data = 'exp_data/leg/data_p0_left_leg.csv'
+output_path_log = 'exp_data/leg/log_p4_right_leg.csv'
+output_path_data = 'exp_data/leg/data_p4_right_leg.csv'
 
 class sensor_read:
     def __init__(self):
@@ -376,14 +376,14 @@ class main_window(QWidget):
 
         
         #指数平均平滑フィルタ
-        if np.allclose(self.old_ema, np.zeros(num_of_sensor, dtype=np.float)):
-            self.old_ema = sensor_val
-        else:
-            for i in range(num_of_sensor):
-                self.new_ema[i] = (
-                    sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
-            self.old_ema = self.new_ema
-        sensor_val = self.new_ema
+        # if np.allclose(self.old_ema, np.zeros(num_of_sensor, dtype=np.float)):
+        #     self.old_ema = sensor_val
+        # else:
+        #     for i in range(num_of_sensor):
+        #         self.new_ema[i] = (
+        #             sensor_val[i] - self.old_ema[i]) * alpha + self.old_ema[i]
+        #     self.old_ema = self.new_ema
+        # sensor_val = self.new_ema
         
         n_sensor_val = np.zeros(num_of_sensor, dtype=np.float)
         #上のフィルタはセンサ値に対して行っているが、こちらのフィルタは、EMAを通過したセンサ値を記録している
@@ -392,34 +392,33 @@ class main_window(QWidget):
         max_val = np.max(sensor_val)
         near_snum = []
 
-        if self.leg_flag:
-            #y座標計算
-            # top_sensor = np.argsort(-sensor_val)
-            self.new_y = max(sensor_val)
-        
-            #x座標計算
-            # for i in range(num_of_sensor):
-            #     if i > 6:
-            #         sensor_val[top_sensor[i]] = 0
-            for i in range(num_of_sensor):
-                self.weight[i] = 1 / (max(sensor_val) - sensor_val[i] + 2)
-            s = sum(self.weight)
-            self.new_x = 0
-            for j in range(num_of_sensor):
-                self.new_x += ((j * self.weight[j] / s))
-            #print(self.new_x)
+        #y座標計算
+        # top_sensor = np.argsort(-sensor_val)
+        self.new_y = max(sensor_val)
+    
+        #x座標計算
+        # for i in range(num_of_sensor):
+        #     if i > 6:
+        #         sensor_val[top_sensor[i]] = 0
+        for i in range(num_of_sensor):
+            self.weight[i] = 1 / (max(sensor_val) - sensor_val[i] + 2)
+        s = sum(self.weight)
+        self.new_x = 0
+        for j in range(num_of_sensor):
+            self.new_x += ((j * self.weight[j] / s))
+        #print(self.new_x)
 
-            #座標平滑フィルタ
-            #xとyで分けてるだけ
+        #座標平滑フィルタ
+        #xとyで分けてるだけ
 
-            self.new_x = (self.new_x - self.old_x) * alpha + self.old_x
-            self.old_x = self.new_x
+        self.new_x = (self.new_x - self.old_x) * alpha + self.old_x
+        self.old_x = self.new_x
 
-            self.new_y = (self.new_y - self.old_y) * beta + self.old_y
-            self.old_y = self.new_y
+        self.new_y = (self.new_y - self.old_y) * alpha + self.old_y
+        self.old_y = self.new_y
 
 
-        print("x: {}, y: {}".format(self.new_x, self.new_y))    
+        # print("x: {}, y: {}".format(self.new_x, self.new_y))    
         return self.new_x, self.new_y
     
     #左方向キャリブレーション

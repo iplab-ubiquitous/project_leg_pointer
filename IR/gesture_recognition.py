@@ -69,6 +69,12 @@ class main_window(QWidget):
         self.timer.start(5)  # 200fps以下
 
         self.val = [0] *10
+
+        self.do_teacher_data_collection = False
+        self.gesture_number = 0
+        self.current_frame_number = 0
+
+        self.gesture_dataset = np.empty([0, 11], float)
         
         for i in range(num_of_sensor):
             self.val[i] = QLineEdit(self)
@@ -82,6 +88,12 @@ class main_window(QWidget):
 
         # self.classifier = self.classify_knee()
 
+    def keyPressEvent(self, keyevent):
+        if keyevent.key() == Qt.Key_Return:
+            print("key event")
+            if self.gesture_number < gestures:
+                self.gesture_number += 1
+            self.do_teacher_data_collection = True
 
     def paintEvent(self, QPaintEvent):
         painter = QPainter(self)
@@ -155,6 +167,22 @@ class main_window(QWidget):
                 self.sensor_val[i] = self.new_ema[i]
             self.old_ema = self.new_ema
         #指数平均平滑フィルタ
+        # print(self.sensor_val)
+
+        if self.do_teacher_data_collection:
+            if self.current_frame_number < 100:
+                v = np.array(self.sensor_val)
+                v = np.append(v, self.gesture_number).reshape(1,11)
+                self.gesture_dataset = np.append(self.gesture_dataset, v, axis=0)
+                print(self.current_frame_number)
+                self.current_frame_number += 1
+            else:
+                self.current_frame_number = 0
+                self.do_teacher_data_collection = False
+                self.gesture_number += 1
+                print("next gesture: {}".format(self.gesture_number))
+                
+
 
 
         self.update()
